@@ -9,10 +9,12 @@ import {
   buildOfficeScene,
   setupLighting,
   applyLightingMode,
+  resolveLightingBand,
   createRenderer,
   createCamera,
 } from './office.js';
 import { createBotManager } from './bots.js';
+import { mountPortal } from './portal.js';
 import { TEAM } from './team.js';
 import {
   startStatusFeed,
@@ -105,7 +107,7 @@ function createActivityFeed() {
   return { push, render };
 }
 
-function createStatusBoard(activity) {
+function createStatusBoard(activity, hooks = {}) {
   const list = document.getElementById('status-list');
   const board = document.getElementById('status-board');
   const toggle = document.getElementById('status-board-toggle');
@@ -137,7 +139,20 @@ function createStatusBoard(activity) {
     const line = document.createElement('div');
     line.className = 'team-line';
     line.hidden = true;
-    main.append(name, dept, line);
+    const portalBadge = document.createElement('div');
+    portalBadge.className = 'team-portal';
+    portalBadge.hidden = true;
+    main.append(name, dept, line, portalBadge);
+
+    li.tabIndex = 0;
+    li.setAttribute('role', 'button');
+    li.addEventListener('click', () => hooks.onSelect?.(member));
+    li.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        hooks.onSelect?.(member);
+      }
+    });
 
     const meta = document.createElement('div');
     meta.className = 'team-meta';
@@ -174,6 +189,15 @@ function createStatusBoard(activity) {
       const info = stateLabel(st.state);
       li.classList.remove('is-working', 'is-handoff', 'is-huddle', 'is-idle', 'is-waiting', 'is-error', 'is-done');
       li.classList.add(info.cls);
+      li.classList.toggle('is-selected', !!hooks.isSelected?.(member.id));
+      li.setAttribute('aria-pressed', hooks.isSelected?.(member.id) ? 'true' : 'false');
+
+      const queued = hooks.portalCount?.(member.id) || 0;
+      const badge = li.querySelector('.team-portal');
+      if (badge) {
+        badge.hidden = queued < 1;
+        badge.textContent = queued > 1 ? `已交總管 · ${queued}` : '已交總管';
+      }
 
       const stateEl = li.querySelector('.team-state');
       const ago = li.querySelector('.team-ago');
@@ -244,7 +268,25 @@ async function boot() {
   const simBadge = document.getElementById('sim-badge');
 
   const activity = createActivityFeed();
-  const statusBoard = createStatusBoard(activity);
+  let selectedId = '';
+  /** @type {ReturnType<typeof mountPortal> | null} */
+  let portal = null;
+  const statusBoard = createStatusBoard(activity, {
+    onSelect: (member) => selectBot(member),
+    isSelected: (id) => id === selectedId,
+    portalCount: (id) => portal?.countFor(id) || 0,
+  });
+  portal = mountPortal({
+    onChange: () => statusBoard.refresh(),
+    onActivity: (text) => activity.push(text),
+  });
+
+  function selectBot(member) {
+    if (!member) return;
+    selectedId = member.id;
+    portal.select(member);
+    statusBoard.refresh();
+  }
 
   const scene = new THREE.Scene();
   const lights = setupLighting(scene);
@@ -274,19 +316,38 @@ async function boot() {
   const { desks } = buildOfficeScene(scene, loader);
   const bots = createBotManager(scene, desks, camera);
 
-  // Lighting toggle
-  let lightMode = 'day';
-  const timeBtns = [...document.querySelectorAll('.time-btn')];
-  function setLightMode(mode) {
-    lightMode = mode;
-    timeBtns.forEach((b) => b.classList.toggle('active', b.dataset.light === mode));
-    const exposure = applyLightingMode(scene, lights, mode);
+  const params = new URLSearchParams(window.location.search);
+  const lightModes = new Set(['now', 'day', 'evening', 'night']);
+  const requestedLight = params.get('light');
+  let lightMode = lightModes.has(requestedLight) ? requestedLight : 'now';
+  let appliedBand = '';
+  const lightNow = document.getElementById('light-now');
+  const hkClock = document.getElementById('hk-clock');
+
+  function paintLighting() {
+    const band = resolveLightingBand(lightMode);
+    const exposure = applyLightingMode(scene, lights, lightMode);
     renderer.toneMappingExposure = exposure;
+    appliedBand = band;
+    if (hkClock) hkClock.textContent = formatClock();
+    if (lightNow) {
+      lightNow.dataset.band = band;
+      lightNow.title = `Asia/Hong_Kong · ${band}`;
+      lightNow.setAttribute('aria-label', `Now · Asia/Hong_Kong · ${band}`);
+    }
   }
-  timeBtns.forEach((btn) => {
-    btn.addEventListener('click', () => setLightMode(btn.dataset.light || 'day'));
+
+  function tickLighting() {
+    if (hkClock) hkClock.textContent = formatClock();
+    if (lightMode !== 'now') return;
+    if (resolveLightingBand('now') !== appliedBand) paintLighting();
+  }
+
+  paintLighting();
+  setInterval(tickLighting, 60_000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') tickLighting();
   });
-  setLightMode('day');
 
   function resize() {
     w = Math.max(1, parent?.clientWidth || window.innerWidth);
@@ -356,13 +417,9 @@ async function boot() {
     refreshAll();
   });
 
-  const params = new URLSearchParams(window.location.search);
   if (params.get('simulate') === '1') {
     startSimulation(setSimChrome);
     refreshAll();
-  }
-  if (params.get('light')) {
-    setLightMode(params.get('light'));
   }
 
   function showHover(member, clientX, clientY) {
@@ -399,9 +456,21 @@ async function boot() {
     showHover(member, e.clientX, e.clientY);
     canvas.style.cursor = member ? 'pointer' : 'grab';
   });
+  let press = null;
   canvas.addEventListener('pointerdown', (e) => {
     const member = bots.pickBot(canvas, e.clientX, e.clientY);
     showHover(member, e.clientX, e.clientY);
+    press = member ? { id: member.id, x: e.clientX, y: e.clientY, member } : null;
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    if (!press) return;
+    const dx = e.clientX - press.x;
+    const dy = e.clientY - press.y;
+    const member = press.member;
+    press = null;
+    if (dx * dx + dy * dy > 36) return;
+    const still = bots.pickBot(canvas, e.clientX, e.clientY);
+    if (still && still.id === member.id) selectBot(member);
   });
   canvas.addEventListener('pointerleave', () => {
     hoverPanel.hidden = true;
@@ -421,8 +490,9 @@ async function boot() {
     self: { pos: [11.5, 6.5, 2.0], target: [5.5, 0.5, -3.5] },
     social: { pos: [11.5, 6.5, 2.0], target: [5.5, 0.5, -3.5] },
     plants: { pos: [10.5, 5.8, -1.5], target: [6.5, 0.7, -4.0] },
-    lead: { pos: [8.5, 5.5, 10.5], target: [4.0, 0.6, 3.5] },
-    reception: { pos: [8.5, 5.5, 10.5], target: [4.0, 0.6, 3.5] },
+    // From inside the floor, looking at 總管's face (they face −Z).
+    lead: { pos: [0.4, 9.2, -2.4], target: [4.0, 0.7, 5.0] },
+    reception: { pos: [0.4, 9.2, -2.4], target: [4.0, 0.7, 5.0] },
     overview: { pos: [12.5, 11.5, 13.5], target: [0.2, 0.3, 0.2] },
     meeting: { pos: [-5.7, 11.4, 8.4], target: [-5.6, 0.2, 3.3] },
   };

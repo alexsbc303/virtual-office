@@ -19,11 +19,17 @@ export const CHAIR = {
   faceYaw: Math.PI,
 };
 
-/** Reception: desk faces entrance (+Z); seated figure faces +Z. */
+/**
+ * Reception desk anchor. The counter sits between 總管 and the floor.
+ * Chair is on the entrance side (+Z); the figure faces −Z into the office.
+ */
+export const RECEPTION_DESK = { x: 4.0, z: 4.35 };
+
+/** 總管 faces the other desks (−Z), not the entrance. */
 export const RECEPTION_CHAIR = {
-  offsetZ: -0.55,
+  offsetZ: 0.78,
   seatY: 0.45,
-  faceYaw: 0,
+  faceYaw: Math.PI,
 };
 
 /**
@@ -127,8 +133,11 @@ export const ZONES = [
 export function deskLayout() {
   const desks = new Map();
 
-  // Reception / 總管 — Bot 總管 at L-desk
-  desks.set(LEAD_ID, seatFromDesk(4.0, 4.2, 'reception', RECEPTION_CHAIR));
+  // Reception / 總管 — behind the counter, facing into the floor
+  desks.set(
+    LEAD_ID,
+    seatFromDesk(RECEPTION_DESK.x, RECEPTION_DESK.z, 'reception', RECEPTION_CHAIR),
+  );
 
   // ITSS1 — 5 partitioned deep-work desks (3 + 2)
   const itss1 = [
@@ -364,7 +373,6 @@ export function buildOfficeScene(scene, _loader) {
   // Tech materials — cool dark metals + glass + warm wood desks
   const wood = mat(0xc49a6c, { roughness: 0.48, metalness: 0.08 });
   const woodWarm = mat(0xa67c52, { roughness: 0.45, metalness: 0.06 });
-  const woodDark = mat(0x6b4f32, { roughness: 0.5, metalness: 0.1 });
   const wall = mat(0x1a2230, { roughness: 0.88, metalness: 0.12 });
   const wallAccent = mat(0x243044, { roughness: 0.75, metalness: 0.25 });
   const charcoal = mat(0x0e141c, { roughness: 0.55, metalness: 0.45 });
@@ -469,7 +477,7 @@ export function buildOfficeScene(scene, _loader) {
   buildSocialLounge(root, wood, woodWarm, sofaMat, loungeAccent, plantLeaf, plantLeafDark, pot, potWarm);
 
   // ——— Meeting (handoff) ———
-  buildMeetingRoom(root, wood, woodWarm, woodDark, glassMat, frost, blackMetal, screenGlow, plantLeaf, pot);
+  buildMeetingRoom(root, wood, woodWarm, blackMetal, screenGlow, plantLeaf, pot);
 
   // ——— General: two shared tables ———
   buildCollabTable(root, -0.4, 2.7, wood, woodWarm, blackMetal, plantLeaf, pot);
@@ -525,6 +533,7 @@ function buildWindowWall(root, wall, charcoal, glassMat) {
     new THREE.PlaneGeometry(ROOM.w * 1.05, ROOM.h * 1.05),
     new THREE.MeshBasicMaterial({ map: skyTex }),
   );
+  view.name = 'window-sky';
   view.position.set(0, ROOM.h / 2 - 0.05, z - 1.6);
   root.add(view);
 
@@ -532,6 +541,7 @@ function buildWindowWall(root, wall, charcoal, glassMat) {
     new THREE.PlaneGeometry(ROOM.w - 0.5, ROOM.h - 0.6),
     new THREE.MeshBasicMaterial({ color: 0x4ad0ff, transparent: true, opacity: 0.06 }),
   );
+  wash.name = 'window-wash';
   wash.position.set(0, ROOM.h / 2, z + 0.06);
   root.add(wash);
 
@@ -735,38 +745,27 @@ function buildSocialLounge(root, wood, woodWarm, sofaMat, loungeAccent, plant, p
   }
 }
 
-function buildMeetingRoom(root, wood, woodWarm, woodDark, glassMat, frost, blackMetal, screenGlow, plant, pot) {
+/** Open meeting area: table, chairs, corner posts, floor LEDs. No glass box. */
+function buildMeetingRoom(root, wood, woodWarm, blackMetal, screenGlow, plant, pot) {
   const cx = MEETING_TABLE.x;
   const cz = MEETING_TABLE.z;
-  const gw = 5.0;
-  const gd = 4.6;
-  const gh = 2.55;
+  const hw = 2.2;
+  const hd = 2.05;
+  const postH = 2.15;
 
-  box(gw, gh, 0.08, frost, cx, gh / 2, cz - gd / 2, root);
-  box(0.08, gh, gd, frost, cx - gw / 2, gh / 2, cz, root);
-  box(0.08, gh, gd, frost, cx + gw / 2, gh / 2, cz, root);
-  box(gw * 0.35, gh, 0.08, frost, cx - gw * 0.3, gh / 2, cz + gd / 2, root);
-  box(gw * 0.35, gh, 0.08, frost, cx + gw * 0.3, gh / 2, cz + gd / 2, root);
   for (const [fx, fz] of [
-    [cx - gw / 2, cz - gd / 2],
-    [cx + gw / 2, cz - gd / 2],
-    [cx - gw / 2, cz + gd / 2],
-    [cx + gw / 2, cz + gd / 2],
+    [cx - hw, cz - hd],
+    [cx + hw, cz - hd],
+    [cx - hw, cz + hd],
+    [cx + hw, cz + hd],
   ]) {
-    box(0.1, gh, 0.1, blackMetal, fx, gh / 2, fz, root);
+    box(0.12, postH, 0.12, blackMetal, fx, postH / 2, fz, root);
+    ledStrip(root, 0.22, 0.22, fx, postH + 0.02, fz, 0x7c4dff, 0.9);
   }
-  ledStrip(root, gw, 0.03, cx, gh - 0.05, cz - gd / 2, 0x7c4dff, 0.7);
-  ledStrip(root, 0.03, gd, cx - gw / 2, gh - 0.05, cz, 0x7c4dff, 0.55);
-
-  for (const side of [
-    { w: gw - 0.2, d: 0.04, x: cx, z: cz - gd / 2 + 0.02 },
-    { w: 0.04, d: gd - 0.2, x: cx - gw / 2 + 0.02, z: cz },
-    { w: 0.04, d: gd - 0.2, x: cx + gw / 2 - 0.02, z: cz },
-  ]) {
-    const g = new THREE.Mesh(new THREE.BoxGeometry(side.w, 1.1, side.d), glassMat);
-    g.position.set(side.x, 1.85, side.z);
-    root.add(g);
-  }
+  ledStrip(root, hw * 2, 0.035, cx, 0.03, cz - hd, 0x7c4dff, 0.65);
+  ledStrip(root, hw * 2, 0.035, cx, 0.03, cz + hd, 0x7c4dff, 0.65);
+  ledStrip(root, 0.035, hd * 2, cx - hw, 0.03, cz, 0x7c4dff, 0.55);
+  ledStrip(root, 0.035, hd * 2, cx + hw, 0.03, cz, 0x7c4dff, 0.55);
 
   box(2.8, 0.06, 1.3, wood, cx, 0.74, cz, root);
   ledStrip(root, 2.6, 0.02, cx, 0.78, cz, 0x7c4dff, 0.5);
@@ -787,8 +786,10 @@ function buildMeetingRoom(root, wood, woodWarm, woodDark, glassMat, frost, black
     box(0.42, 0.4, 0.06, seat, cx + ox, 0.65, cz + oz + back, root);
   }
 
-  box(0.06, 1.1, 1.8, blackMetal, cx - gw / 2 + 0.12, 1.55, cz, root);
-  box(0.04, 1.0, 1.65, screenGlow, cx - gw / 2 + 0.16, 1.55, cz, root, false);
+  // Freestanding display — not a wall.
+  box(0.08, 0.7, 0.08, blackMetal, cx - 1.9, 0.35, cz, root);
+  box(0.06, 1.05, 1.55, blackMetal, cx - 1.9, 1.35, cz, root);
+  box(0.03, 0.95, 1.4, screenGlow, cx - 1.86, 1.35, cz, root, false);
 
   buildProceduralPlant(root, cx - 1.8, cz + 1.8, plant, plant, plant, pot, pot, 'fern', 0.9);
 }
@@ -811,21 +812,23 @@ function buildPhoneBooths(root, wood, woodWarm, blackMetal, partitionMat, screen
 }
 
 function buildReception(root, wood, woodWarm, blackMetal, sofaMat, plant, plantDark, pot, potWarm, screenGlow) {
-  // L-shaped reception desk (shifted into SE zone)
-  box(3.0, 0.95, 0.7, wood, 4.0, 0.48, 4.55, root);
-  box(3.0, 0.05, 0.75, woodWarm, 4.0, 0.98, 4.55, root);
-  ledStrip(root, 2.9, 0.025, 4.0, 1.01, 4.2, 0xff80ab, 0.75);
-  box(0.7, 0.95, 2.0, wood, 5.15, 0.48, 3.4, root);
-  box(0.75, 0.05, 2.0, woodWarm, 5.15, 0.98, 3.4, root);
+  // L-shaped counter. 總管 sits on the entrance side and looks −Z across the desk.
+  const dx = RECEPTION_DESK.x;
+  const dz = RECEPTION_DESK.z;
+  const chairZ = dz + RECEPTION_CHAIR.offsetZ;
+  box(3.2, 0.95, 0.7, wood, dx, 0.48, dz, root);
+  box(3.2, 0.05, 0.75, woodWarm, dx, 0.98, dz, root);
+  ledStrip(root, 3.05, 0.025, dx, 1.01, dz - 0.34, 0xff80ab, 0.75);
+  box(0.7, 0.95, 1.9, wood, dx + 1.35, 0.48, dz - 1.05, root);
+  box(0.75, 0.05, 1.9, woodWarm, dx + 1.35, 0.98, dz - 1.05, root);
 
-  box(0.5, 0.34, 0.03, blackMetal, 4.0, 1.25, 4.35, root);
-  box(0.46, 0.28, 0.012, screenGlow, 4.0, 1.25, 4.33, root, false);
+  box(0.5, 0.34, 0.03, blackMetal, dx - 0.15, 1.25, dz + 0.2, root);
+  box(0.46, 0.28, 0.012, screenGlow, dx - 0.15, 1.25, dz + 0.22, root, false);
 
   const seat = mat(0x1a222c, { roughness: 0.55, metalness: 0.25 });
-  const chairZ = 4.2 - 0.55;
-  box(0.5, 0.08, 0.5, seat, 4.0, 0.435, chairZ, root);
-  box(0.5, 0.52, 0.07, seat, 4.0, 0.72, chairZ - 0.2, root);
-  cyl(0.055, 0.055, 0.34, blackMetal, 4.0, 0.22, chairZ, root, 10, false);
+  box(0.5, 0.08, 0.5, seat, dx, 0.435, chairZ, root);
+  box(0.5, 0.52, 0.07, seat, dx, 0.72, chairZ + 0.2, root);
+  cyl(0.055, 0.055, 0.34, blackMetal, dx, 0.22, chairZ, root, 10, false);
 
   // LED green-wall / planter
   box(0.45, 2.2, 3.0, mat(0x1a2430, { metalness: 0.45, roughness: 0.45 }), 6.5, 1.1, 3.5, root);
@@ -1125,66 +1128,100 @@ export function setupLighting(scene) {
   return { hemi, sun, fill, ambient, points };
 }
 
-/** @param {'now'|'day'|'evening'|'night'} mode */
-export function applyLightingMode(scene, lights, mode) {
-  let resolved = mode;
-  if (mode === 'now') {
-    const h = new Date().toLocaleString('en-US', {
+/** Day 06:00–16:00, evening 16:00–20:00, otherwise night. Hour is 0–23. */
+export function bandFromHour(hour) {
+  const h = Number(hour);
+  if (!Number.isFinite(h)) return 'day';
+  const wrapped = ((Math.floor(h) % 24) + 24) % 24;
+  if (wrapped >= 6 && wrapped < 16) return 'day';
+  if (wrapped >= 16 && wrapped < 20) return 'evening';
+  return 'night';
+}
+
+/** Wall-clock hour in Asia/Hong_Kong (0–23). */
+export function hongKongHour(date = new Date()) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: 'Asia/Hong_Kong',
       hour: 'numeric',
-      hour12: false,
-    });
-    const hour = Number(h);
-    if (hour >= 6 && hour < 16) resolved = 'day';
-    else if (hour >= 16 && hour < 20) resolved = 'evening';
-    else resolved = 'night';
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const hour = Number(parts.find((p) => p.type === 'hour')?.value);
+    if (Number.isFinite(hour)) return hour % 24;
+  } catch {
+    /* fall through */
   }
+  return date.getUTCHours();
+}
+
+/**
+ * @param {'now'|'day'|'evening'|'night'} [mode]
+ * @param {Date} [date]
+ * @returns {'day'|'evening'|'night'}
+ */
+export function resolveLightingBand(mode = 'now', date = new Date()) {
+  if (mode === 'day' || mode === 'evening' || mode === 'night') return mode;
+  return bandFromHour(hongKongHour(date));
+}
+
+/** @param {'now'|'day'|'evening'|'night'} mode */
+export function applyLightingMode(scene, lights, mode) {
+  const resolved = resolveLightingBand(mode);
 
   const presets = {
     day: {
-      bg: 0x152030,
-      fog: 0x152030,
-      hemiSky: 0xc0d8f0,
-      hemiGround: 0x1a2838,
-      hemiI: 0.85,
-      sunC: 0xe0f0ff,
-      sunI: 1.85,
-      fillC: 0x90b0cc,
-      fillI: 0.5,
-      ambC: 0x7a90a8,
-      ambI: 0.42,
-      pointMul: 1,
-      exposure: 1.05,
+      bg: 0xc5e6ff,
+      fog: 0xb7daf8,
+      hemiSky: 0xfff6df,
+      hemiGround: 0x8ea8bc,
+      hemiI: 1.2,
+      sunC: 0xfff3cc,
+      sunI: 2.75,
+      sunPos: [-4, 18, -14],
+      fillC: 0xd5ebff,
+      fillI: 0.9,
+      ambC: 0xfff8ee,
+      ambI: 0.58,
+      pointMul: 0.22,
+      wash: 0xfff1c2,
+      washOpacity: 0.2,
+      exposure: 1.08,
     },
     evening: {
-      bg: 0x1a1528,
-      fog: 0x1a1528,
+      bg: 0x3a241c,
+      fog: 0x3a241c,
       hemiSky: 0xffb090,
       hemiGround: 0x2a2030,
-      hemiI: 0.65,
-      sunC: 0xff8a5a,
-      sunI: 1.35,
+      hemiI: 0.7,
+      sunC: 0xff7a45,
+      sunI: 1.45,
+      sunPos: [10, 6, 6],
       fillC: 0x8090c0,
-      fillI: 0.4,
+      fillI: 0.38,
       ambC: 0x6a5878,
-      ambI: 0.35,
-      pointMul: 1.25,
+      ambI: 0.32,
+      pointMul: 1.35,
+      wash: 0xff8a5a,
+      washOpacity: 0.14,
       exposure: 1.0,
     },
     night: {
-      bg: 0x060a12,
-      fog: 0x060a12,
-      hemiSky: 0x304060,
-      hemiGround: 0x0a1018,
-      hemiI: 0.28,
-      sunC: 0x506080,
-      sunI: 0.25,
-      fillC: 0x304858,
-      fillI: 0.2,
-      ambC: 0x182030,
-      ambI: 0.25,
-      pointMul: 1.85,
-      exposure: 0.92,
+      bg: 0x03060c,
+      fog: 0x03060c,
+      hemiSky: 0x1a3058,
+      hemiGround: 0x05080e,
+      hemiI: 0.14,
+      sunC: 0x243044,
+      sunI: 0.08,
+      sunPos: [-2, 9, 8],
+      fillC: 0x182838,
+      fillI: 0.08,
+      ambC: 0x0c121c,
+      ambI: 0.08,
+      pointMul: 2.35,
+      wash: 0x1a6cff,
+      washOpacity: 0.04,
+      exposure: 0.98,
     },
   };
   const p = presets[resolved] || presets.day;
@@ -1197,6 +1234,7 @@ export function applyLightingMode(scene, lights, mode) {
   lights.hemi.intensity = p.hemiI;
   lights.sun.color.setHex(p.sunC);
   lights.sun.intensity = p.sunI;
+  lights.sun.position.set(p.sunPos[0], p.sunPos[1], p.sunPos[2]);
   lights.fill.color.setHex(p.fillC);
   lights.fill.intensity = p.fillI;
   lights.ambient.color.setHex(p.ambC);
@@ -1205,6 +1243,20 @@ export function applyLightingMode(scene, lights, mode) {
   lights.points.forEach((pt, i) => {
     pt.intensity = (base[i] ?? 0.5) * p.pointMul;
   });
+
+  const sky = scene.getObjectByName('window-sky');
+  if (sky?.material && sky.userData.band !== resolved) {
+    const prev = sky.material.map;
+    sky.material.map = createSoftSkyTexture(THREE, 1024, 512, resolved);
+    sky.material.needsUpdate = true;
+    sky.userData.band = resolved;
+    if (prev && prev !== sky.material.map) prev.dispose();
+  }
+  const wash = scene.getObjectByName('window-wash');
+  if (wash?.material) {
+    wash.material.color.setHex(p.wash);
+    wash.material.opacity = p.washOpacity;
+  }
   return p.exposure;
 }
 
