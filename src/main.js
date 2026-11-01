@@ -165,7 +165,7 @@ async function boot() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
+  renderer.toneMappingExposure = 1.0;
 
   const { scene, desks, animatables, leadDoor } = buildOffice();
 
@@ -190,7 +190,7 @@ async function boot() {
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.14, 0.6, 0.9);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.18, 0.55, 0.88);
   composer.addPass(bloom);
 
   sizeRenderer(renderer, camera, composer, bloom, canvas);

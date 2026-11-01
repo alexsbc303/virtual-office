@@ -1,11 +1,11 @@
 :root {
-  --bg: #e6ebe8;
-  --panel: #f7f8f6;
-  --panel-solid: #fbfcfb;
+  --bg: #ebe6df;
+  --panel: #fbf8f3;
+  --panel-solid: #fffdf9;
   --ink: #1c2430;
   --muted: #5c6773;
-  --line: #c8d0d6;
-  --line-soft: #dde3e8;
+  --line: #d2c9be;
+  --line-soft: #e6dfd5;
   --accent: #1a237e;
   --accent-soft: #e8eaf6;
   --warn: #b71c1c;
@@ -15,7 +15,7 @@
   --hand: #e65100;
   --hand-bg: #fff3e0;
   --idle: #78909c;
-  --shadow: 0 8px 28px rgba(28, 36, 48, 0.1);
+  --shadow: 0 8px 28px rgba(60, 42, 28, 0.1);
   --radius: 10px;
   --tap: 44px;
   --font: "Noto Sans TC", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
@@ -57,8 +57,8 @@ input {
   padding-top: calc(1.25rem + var(--safe-t));
   padding-bottom: calc(1.25rem + var(--safe-b));
   background:
-    radial-gradient(ellipse at 30% 20%, #f0f4f1 0%, transparent 55%),
-    linear-gradient(165deg, #dfe6e2 0%, #c5d0d8 100%);
+    radial-gradient(ellipse at 30% 20%, #fff6ea 0%, transparent 55%),
+    linear-gradient(165deg, #efe6da 0%, #d4dde8 100%);
   z-index: 100;
 }
 

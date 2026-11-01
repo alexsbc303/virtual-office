@@ -5,7 +5,7 @@ import { getEffectiveStatus } from './supabase.js';
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({
     color,
-    roughness: opts.roughness ?? 0.88,
+    roughness: opts.roughness ?? 0.82,
     metalness: opts.metalness ?? 0.02,
   });
 }
@@ -16,9 +16,9 @@ function makeTagTexture(shortName) {
   c.width = 256;
   c.height = 64;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = 'rgba(247, 246, 243, 0.94)';
+  ctx.fillStyle = 'rgba(255, 253, 249, 0.94)';
   ctx.fillRect(0, 0, 256, 64);
-  ctx.strokeStyle = 'rgba(120, 130, 140, 0.45)';
+  ctx.strokeStyle = 'rgba(120, 130, 140, 0.4)';
   ctx.strokeRect(1, 1, 254, 62);
   ctx.fillStyle = '#3a4550';
   ctx.font = '500 20px "Noto Sans TC", "Segoe UI", sans-serif';
@@ -32,7 +32,8 @@ function makeTagTexture(shortName) {
 }
 
 /**
- * Slightly refined matte person — still readable colour blocks, less toy.
+ * Soft anime-adjacent silhouette — rounder head, softer torso, team colour retained.
+ * Still readable colour blocks, less toy/blocky than pure boxes.
  */
 function createPersonMesh(member) {
   const g = new THREE.Group();
@@ -40,39 +41,88 @@ function createPersonMesh(member) {
   g.userData.member = member;
 
   const color = parseInt(member.color.slice(1), 16);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.52, 0.2), mat(color, { roughness: 0.9 }));
-  body.position.y = 0.94;
+  const skin = 0xf0d5c4;
+
+  // Soft torso (slightly tapered capsule feel via cylinder)
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.15, 0.18, 0.52, 14),
+    mat(color, { roughness: 0.88 }),
+  );
+  body.position.y = 0.96;
   body.castShadow = true;
 
-  const head = new THREE.Mesh(
-    new THREE.BoxGeometry(0.26, 0.26, 0.26),
-    mat(color, { roughness: 0.85 }),
+  // Shoulder softener
+  const shoulders = new THREE.Mesh(
+    new THREE.SphereGeometry(0.2, 12, 10),
+    mat(color, { roughness: 0.88 }),
   );
-  head.position.y = 1.36;
+  shoulders.position.y = 1.18;
+  shoulders.scale.set(1.15, 0.55, 0.7);
+  shoulders.castShadow = true;
+
+  // Round head (anime-adjacent)
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.155, 16, 14),
+    mat(skin, { roughness: 0.75 }),
+  );
+  head.position.y = 1.42;
   head.castShadow = true;
 
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.42, 0.13), mat(0x2f3b42));
-  legL.position.set(-0.09, 0.34, 0);
+  // Soft hair cap in team colour
+  const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.162, 14, 12),
+    mat(color, { roughness: 0.9 }),
+  );
+  hair.position.y = 1.48;
+  hair.scale.set(1.02, 0.72, 1.05);
+  hair.castShadow = true;
+
+  // Soft legs
+  const legL = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.055, 0.06, 0.44, 10),
+    mat(0x2f3b42, { roughness: 0.85 }),
+  );
+  legL.position.set(-0.07, 0.34, 0);
   legL.castShadow = true;
-  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.42, 0.13), mat(0x2f3b42));
-  legR.position.set(0.09, 0.34, 0);
+  const legR = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.055, 0.06, 0.44, 10),
+    mat(0x2f3b42, { roughness: 0.85 }),
+  );
+  legR.position.set(0.07, 0.34, 0);
   legR.castShadow = true;
 
-  const acc = new THREE.Mesh(
-    new THREE.BoxGeometry(0.12, 0.07, 0.09),
-    mat(0xb0bec5, { roughness: 0.55, metalness: 0.15 }),
+  // Arms (subtle)
+  const armL = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.045, 0.36, 8),
+    mat(color, { roughness: 0.88 }),
   );
-  acc.position.set(0.2, 0.98, 0.04);
+  armL.position.set(-0.22, 0.95, 0);
+  armL.rotation.z = 0.18;
+  armL.castShadow = true;
+  const armR = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.045, 0.36, 8),
+    mat(color, { roughness: 0.88 }),
+  );
+  armR.position.set(0.22, 0.95, 0);
+  armR.rotation.z = -0.18;
+  armR.castShadow = true;
+
+  // Accessory token
+  const acc = new THREE.Mesh(
+    new THREE.BoxGeometry(0.11, 0.06, 0.08),
+    mat(0xcfd8dc, { roughness: 0.5, metalness: 0.12 }),
+  );
+  acc.position.set(0.18, 1.0, 0.1);
   acc.castShadow = true;
 
-  g.add(body, head, legL, legR, acc);
+  g.add(body, shoulders, head, hair, legL, legR, armL, armR, acc);
 
   const tagTex = makeTagTexture(member.name);
   const tag = new THREE.Mesh(
     new THREE.PlaneGeometry(1.05, 0.26),
     new THREE.MeshBasicMaterial({ map: tagTex, transparent: true, depthWrite: false }),
   );
-  tag.position.y = 1.7;
+  tag.position.y = 1.72;
   tag.userData.isTag = true;
   g.add(tag);
 
