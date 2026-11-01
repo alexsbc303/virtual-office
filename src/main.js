@@ -1,11 +1,8 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-
+/**
+ * AS Virtual Office — 2D anime Canvas2D office (no Three.js).
+ */
 import { runPasswordGate } from './auth.js';
-import { buildOffice, updateOfficeAnims } from './office.js';
+import { buildOfficeBackground, deskLayout, SCENE_W, SCENE_H } from './office.js';
 import { createBotManager } from './bots.js';
 import { TEAM } from './team.js';
 import {
@@ -84,7 +81,6 @@ function createStatusBoard() {
     rows.set(member.id, li);
   }
 
-  // Start expanded so all 12 bots are scannable; user may collapse on mobile.
   board.classList.remove('collapsed');
   toggle.setAttribute('aria-expanded', 'true');
 
@@ -133,15 +129,50 @@ function createStatusBoard() {
   return { refresh };
 }
 
-function sizeRenderer(renderer, camera, composer, bloom, canvas) {
-  const parent = canvas.parentElement;
-  const w = Math.max(1, parent?.clientWidth || window.innerWidth);
-  const h = Math.max(1, parent?.clientHeight || window.innerHeight);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-  renderer.setSize(w, h, false);
-  composer.setSize(w, h);
-  bloom.setSize(w, h);
+/**
+ * Map canvas CSS pixels → scene coordinates, covering the view with letterboxing.
+ */
+function createViewMapper(canvas) {
+  let scale = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+  let cssW = 1;
+  let cssH = 1;
+
+  function resize() {
+    const parent = canvas.parentElement;
+    cssW = Math.max(1, parent?.clientWidth || window.innerWidth);
+    cssH = Math.max(1, parent?.clientHeight || window.innerHeight);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(cssW * dpr);
+    canvas.height = Math.floor(cssH * dpr);
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
+
+    // Cover mode — fill stage, may crop edges slightly
+    scale = Math.max(cssW / SCENE_W, cssH / SCENE_H);
+    offsetX = (cssW - SCENE_W * scale) / 2;
+    offsetY = (cssH - SCENE_H * scale) / 2;
+  }
+
+  function toScene(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (clientX - rect.left - offsetX) / scale;
+    const y = (clientY - rect.top - offsetY) / scale;
+    return { x, y };
+  }
+
+  function apply(ctx) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    ctx.fillStyle = '#ebe6df';
+    ctx.fillRect(0, 0, cssW, cssH);
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+  }
+
+  return { resize, toScene, apply, get scale() { return scale; } };
 }
 
 async function boot() {
@@ -158,44 +189,13 @@ async function boot() {
   const simBadge = document.getElementById('sim-badge');
 
   const statusBoard = createStatusBoard();
+  const background = buildOfficeBackground();
+  const desks = deskLayout();
+  const bots = createBotManager(desks);
+  const view = createViewMapper(canvas);
+  const ctx = canvas.getContext('2d');
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
-
-  const { scene, desks, animatables, leadDoor } = buildOffice();
-
-  const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 80);
-  camera.position.set(-6, 14, 16);
-
-  const controls = new OrbitControls(camera, canvas);
-  controls.target.set(1, 0.5, 1);
-  controls.maxPolarAngle = Math.PI * 0.48;
-  controls.minDistance = 6;
-  controls.maxDistance = 36;
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.07;
-  controls.rotateSpeed = 0.55;
-  controls.zoomSpeed = 0.85;
-  controls.panSpeed = 0.55;
-  controls.touches = {
-    ONE: THREE.TOUCH.ROTATE,
-    TWO: THREE.TOUCH.DOLLY_PAN,
-  };
-  controls.update();
-
-  const composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.18, 0.55, 0.88);
-  composer.addPass(bloom);
-
-  sizeRenderer(renderer, camera, composer, bloom, canvas);
-
-  const bots = createBotManager(scene, desks, leadDoor);
+  view.resize();
 
   function refreshUsageUI() {
     const u = getUsageSnapshot();
@@ -246,7 +246,6 @@ async function boot() {
   await startStatusFeed();
   refreshAll();
 
-  // Keep relative times fresh
   setInterval(() => statusBoard.refresh(), 15_000);
 
   simBtn.addEventListener('click', () => {
@@ -259,9 +258,6 @@ async function boot() {
     startSimulation(setSimChrome);
     refreshAll();
   }
-
-  const raycaster = new THREE.Raycaster();
-  const pointer = new THREE.Vector2();
 
   function showHover(member, clientX, clientY) {
     if (!member) {
@@ -280,51 +276,45 @@ async function boot() {
     hoverStatus.textContent = st.line ? `${stateText} — ${st.line}` : stateText;
     hoverPanel.hidden = false;
     const pad = 12;
-    const rect = hoverPanel.getBoundingClientRect();
     let x = clientX + pad;
     let y = clientY + pad;
-    if (x + Math.min(280, rect.width || 200) > window.innerWidth) x = clientX - 200;
+    if (x + 200 > window.innerWidth) x = clientX - 200;
     if (y + 110 > window.innerHeight) y = clientY - 110;
     hoverPanel.style.left = `${Math.max(8, x)}px`;
     hoverPanel.style.top = `${Math.max(8, y)}px`;
   }
 
-  function pointerNdc(e) {
-    const rect = canvas.getBoundingClientRect();
-    pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  }
-
   canvas.addEventListener('pointermove', (e) => {
-    pointerNdc(e);
-    raycaster.setFromCamera(pointer, camera);
-    const member = bots.pickBot(raycaster);
+    const { x, y } = view.toScene(e.clientX, e.clientY);
+    const member = bots.pickBot(x, y);
     showHover(member, e.clientX, e.clientY);
     canvas.style.cursor = member ? 'pointer' : 'default';
   });
 
   canvas.addEventListener('pointerdown', (e) => {
-    pointerNdc(e);
-    raycaster.setFromCamera(pointer, camera);
-    const member = bots.pickBot(raycaster);
+    const { x, y } = view.toScene(e.clientX, e.clientY);
+    const member = bots.pickBot(x, y);
     showHover(member, e.clientX, e.clientY);
   });
 
-  window.addEventListener('resize', () => {
-    sizeRenderer(renderer, camera, composer, bloom, canvas);
+  canvas.addEventListener('pointerleave', () => {
+    hoverPanel.hidden = true;
   });
 
-  const clock = new THREE.Clock();
-  function frame() {
+  window.addEventListener('resize', () => view.resize());
+
+  let last = performance.now();
+  function frame(now) {
     requestAnimationFrame(frame);
-    const dt = Math.min(clock.getDelta(), 0.05);
-    const t = clock.elapsedTime;
-    controls.update();
-    updateOfficeAnims(animatables, t);
-    bots.update(dt, camera);
-    composer.render();
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    bots.update(dt);
+
+    view.apply(ctx);
+    ctx.drawImage(background, 0, 0);
+    bots.draw(ctx, getEffectiveStatus);
   }
-  frame();
+  requestAnimationFrame(frame);
 }
 
 boot().catch((err) => {
