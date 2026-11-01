@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="AS Virtual Office — 3D virtual office for the AS bot team" />
+    <meta name="theme-color" content="#0b1220" />
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <title>AS Virtual Office · 虛擬辦公室</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script type="module" crossorigin src="/virtual-office/assets/index-TmrveCyi.js"></script>
+    <link rel="stylesheet" crossorigin href="/virtual-office/assets/index-DRVQmkUH.css">
+  </head>
+  <body>
+    <div id="app" class="app">
+      <div class="stage">
+        <canvas id="office-canvas"></canvas>
+
+        <!-- Top-left HUD -->
+        <div class="hud-top">
+          <div class="hud-brand">
+            <span class="hud-title">AS Virtual Office</span>
+            <span id="sim-badge" class="sim-pill" hidden>Simulation</span>
+          </div>
+          <div id="hud-counters" class="hud-counters" aria-live="polite">
+            <span class="hud-chip"><i class="dot working"></i><b id="hud-working">0</b> working</span>
+            <span class="hud-chip"><i class="dot huddle"></i><b id="hud-huddle">0</b> huddle</span>
+            <span class="hud-chip"><i class="dot handoff"></i><b id="hud-handoff">0</b> handoff</span>
+            <span class="hud-chip"><i class="dot idle"></i><b id="hud-idle">12</b> idle</span>
+            <span class="hud-chip"><i class="dot free"></i><b id="hud-free">12</b> free desks</span>
+          </div>
+          <div id="feed-conn" class="feed-conn" data-state="connecting" role="status">Feed · connecting</div>
+          <div id="feed-warning" class="feed-warning" hidden>
+            Status feed quiet &gt; 45 min · 狀態饋送靜默超過 45 分鐘
+          </div>
+          <div id="usage-board" class="usage-mini" title="Weekly usage snapshot">
+            <span class="usage-en">Weekly usage: —</span>
+          </div>
+        </div>
+
+        <!-- Right dark sidebar -->
+        <aside id="status-board" class="side-panel" aria-label="Team roster">
+          <div class="side-panel-head">
+            <button
+              type="button"
+              id="status-board-toggle"
+              class="side-toggle"
+              aria-expanded="true"
+              aria-controls="side-body"
+            >
+              <span class="side-toggle-title">Team · 團隊</span>
+              <span id="team-count" class="side-count">12</span>
+              <span class="toggle-chevron" aria-hidden="true">▾</span>
+            </button>
+          </div>
+          <div id="side-body" class="side-body">
+            <ul id="status-list" class="team-list" role="list"></ul>
+            <div class="activity-block">
+              <div class="activity-head">Activity · 動態</div>
+              <ul id="activity-list" class="activity-list" role="list"></ul>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Bottom chrome -->
+        <div class="hud-bottom">
+          <div class="status-legend" aria-label="Status legend">
+            <span><i class="dot working"></i> Working · 工作中</span>
+            <span><i class="dot huddle"></i> Huddle · 會議</span>
+            <span><i class="dot handoff"></i> Handoff · 交接</span>
+            <span><i class="dot idle"></i> Idle · 閒置</span>
+          </div>
+
+          <div id="light-now" class="time-toggle" role="status" aria-live="polite" aria-label="Now · Asia/Hong_Kong">
+            <span class="time-kicker">Now</span>
+            <span id="hk-clock" class="time-clock">—</span>
+          </div>
+
+          <button id="simulate-btn" type="button" class="sim-btn">
+            Simulate Work
+            <span class="zh">模擬工作</span>
+          </button>
+        </div>
+      </div>
+
+      <aside id="portal-panel" class="portal-panel" hidden aria-label="Portal handoff">
+        <div class="portal-head">
+          <div>
+            <div class="portal-kicker">Portal · 指令交接</div>
+            <div id="portal-bot" class="portal-bot">Select a bot</div>
+            <div id="portal-dept" class="portal-dept"></div>
+          </div>
+          <button type="button" id="portal-close" class="portal-close" aria-label="Close portal">✕</button>
+        </div>
+        <form id="portal-form" class="portal-form">
+          <label class="portal-label" for="portal-input">Message / command · 訊息或指令</label>
+          <textarea
+            id="portal-input"
+            rows="3"
+            maxlength="500"
+            placeholder="交給總管的訊息或指令"
+            disabled
+          ></textarea>
+          <div class="portal-actions">
+            <button type="submit" id="portal-send" class="portal-send" disabled>Send · 送出</button>
+            <span id="portal-confirm" class="portal-confirm" hidden>已交總管佇列</span>
+          </div>
+          <p class="portal-note">
+            Send writes the 總管 queue. This browser keeps a copy if that write fails. Not a Cursor chat.
+            送出寫入總管佇列；寫入失敗時只留本機備份。不是 Cursor 聊天。
+          </p>
+        </form>
+        <ul id="portal-queue" class="portal-queue" aria-label="Handoff queue"></ul>
+      </aside>
+
+      <aside id="hover-panel" class="hover-panel" hidden>
+        <div id="hover-name" class="hover-name"></div>
+        <div id="hover-dept" class="hover-dept"></div>
+        <div id="hover-status" class="hover-status"></div>
+      </aside>
+    </div>
+
+  </body>
+</html>
