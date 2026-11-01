@@ -84,22 +84,14 @@ function createStatusBoard() {
     rows.set(member.id, li);
   }
 
-  function applyMobileDefaultCollapse() {
-    const narrow = window.matchMedia('(max-width: 719px)').matches;
-    if (narrow && !board.dataset.userToggled) {
-      board.classList.add('collapsed');
-      toggle.setAttribute('aria-expanded', 'false');
-    }
-  }
+  // Start expanded so all 12 bots are scannable; user may collapse on mobile.
+  board.classList.remove('collapsed');
+  toggle.setAttribute('aria-expanded', 'true');
 
   toggle.addEventListener('click', () => {
-    board.dataset.userToggled = '1';
     const collapsed = board.classList.toggle('collapsed');
     toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   });
-
-  applyMobileDefaultCollapse();
-  window.addEventListener('resize', applyMobileDefaultCollapse);
 
   function refresh() {
     let working = 0;
