@@ -1,6 +1,10 @@
 /**
- * Portal handoff — a local queue plus an optional public webhook.
- * This does not open Cursor chat and does not write Supabase with the anon key.
+ * Portal handoff — Supabase queue, optional public webhook, localStorage cache.
+ * This does not open Cursor chat and never sends the service-role key.
+ *
+ * Send calls the `portal-handoff` Edge Function with the anon key (or the
+ * signed-in session). The function inserts `portal_handoffs` with the
+ * service role. localStorage is only a cache / offline fallback.
  *
  * POST ${VITE_HANDOFF_WEBHOOK_URL}  (https or http, public URL only)
  * Content-Type: application/json
@@ -14,9 +18,10 @@
  *   "message": "<operator text, 1–500 chars>"
  * }
  * The page also dispatches window event "vo-portal-handoff" with that JSON as detail.
- * Operators who want a row can apply sql/portal_handoffs.sql and insert with the service role.
+ * Hub owns the 總管-side bridge: poll the table, or accept the same webhook body.
  */
 import { LEAD_ID, getTeamMember } from './team.js';
+import { getClient } from './supabase.js';
 
 const STORAGE_KEY = 'vo.portal.handoffs.v1';
 const MAX_ITEMS = 30;
@@ -87,8 +92,29 @@ export function buildHandoffPayload(bot, message, id = newId(), createdAt = new 
 }
 
 /**
- * Persist locally first, emit the handoff event, then POST if a webhook is set.
- * @returns {Promise<{ record: object, items: object[], webhook: boolean }>}
+ * Edge Function insert. The anon client never sees the service-role key.
+ * @returns {Promise<{ ok: boolean, error?: string }>}
+ */
+async function writeHandoffQueue(payload) {
+  const supabase = getClient();
+  if (!supabase) return { ok: false, error: 'unconfigured' };
+  try {
+    const { data, error } = await supabase.functions.invoke('portal-handoff', {
+      body: payload,
+    });
+    if (error || !data?.ok) {
+      return { ok: false, error: error?.message || data?.error || 'invoke' };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'network' };
+  }
+}
+
+/**
+ * Cache locally, write the Supabase queue, then POST the optional webhook.
+ * A webhook miss does not undo a successful queue write.
+ * @returns {Promise<{ record: object, items: object[], webhook: boolean, queued: boolean }>}
  */
 export async function submitHandoff(bot, message) {
   const payload = buildHandoffPayload(bot, message);
@@ -104,32 +130,34 @@ export async function submitHandoff(bot, message) {
   saveHandoffs(items);
   window.dispatchEvent(new CustomEvent('vo-portal-handoff', { detail: payload }));
 
+  const queued = await writeHandoffQueue(payload);
+  if (queued.ok) record.delivery = 'queued';
+
   const hook = handoffWebhookUrl();
-  if (!hook) {
-    return { record, items, webhook: false };
+  if (hook) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), WEBHOOK_TIMEOUT_MS);
+    try {
+      const res = await fetch(hook, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal,
+      });
+      record.http_status = res.status;
+      record.webhook = res.ok ? 'sent' : 'failed';
+    } catch {
+      record.webhook = 'failed';
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), WEBHOOK_TIMEOUT_MS);
-  try {
-    const res = await fetch(hook, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(payload),
-      signal: ctrl.signal,
-    });
-    record.delivery = res.ok ? 'sent' : 'failed';
-    record.http_status = res.status;
-  } catch {
-    record.delivery = 'failed';
-  } finally {
-    clearTimeout(timer);
-  }
   saveHandoffs(items);
-  return { record, items, webhook: true };
+  return { record, items, webhook: Boolean(hook), queued: queued.ok };
 }
 
 export function handoffsFor(botId) {
@@ -137,9 +165,8 @@ export function handoffsFor(botId) {
 }
 
 export function deliveryLabel(delivery) {
-  if (delivery === 'sent') return '已交總管 · webhook accepted';
-  if (delivery === 'failed') return '已交總管 · 本機佇列（webhook 未送達）';
-  return '已交總管 · 本機佇列';
+  if (delivery === 'queued') return '已交總管佇列';
+  return '未送達總管佇列 · 已留本機';
 }
 
 /**

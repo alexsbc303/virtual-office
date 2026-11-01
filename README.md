@@ -15,23 +15,15 @@ activity feed, status legend, **Now** lighting (Asia/Hong_Kong). Live presence v
 
 ```bash
 cp .env.example .env
-# Fill VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_OFFICE_PASSWORD_HASH
+# Fill VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY only.
+# Never put SUPABASE_SERVICE_ROLE_KEY in a VITE_ variable or in git.
 npm install
 npm run dev
 ```
 
-Open the printed local URL (`base: /virtual-office/`). Without Supabase credentials the office still loads; all bots remain idle until Realtime data arrives.
+Open the printed local URL (`base: /virtual-office/`). The office opens directly — there is no password gate. Without Supabase credentials the office still loads; all bots remain idle until Realtime data arrives, and a portal send stays in the browser cache until the queue write can succeed.
 
 Orbit / drag the view to feel depth. Soft auto-sway when idle.
-
-### Password hash
-
-```bash
-echo -n 'your-password' | sha256sum
-# Put the hex digest in VITE_OFFICE_PASSWORD_HASH (no plaintext in repo)
-```
-
-If `VITE_OFFICE_PASSWORD_HASH` is empty, the gate opens for local builds.
 
 ### Simulate Work
 
@@ -53,17 +45,21 @@ Same `--room-id` on two or more bots seats them together (sorted `bot_id` → ch
 
 ### Portal handoff
 
-Click a bot figure or a roster row, type a message or command, and send. The panel confirms **已交總管** and keeps a browser queue (`localStorage`) even when nothing else is configured.
+Click a bot figure or a roster row, type a message or command, and send. A successful write confirms **已交總管佇列**.
 
-This is a handoff contract for operators. It does **not** open Cursor chat and it does not write Supabase with the anon key.
+This does **not** open Cursor chat. Hub owns the 總管-side bridge (read the queue, or accept the webhook, and act on it).
 
-Optional public webhook (never a service-role key):
+**Write path:** Edge Function `portal-handoff` (`supabase/functions/portal-handoff/index.ts`). The page calls it with the anon key. The function checks the body (message 1–500, `source = virtual-office`, uuid `id` / `bot.id`, lead id is Bot 總管) and inserts with the service role. That key lives only in the function environment. Apply `sql/portal_handoffs.sql` before the first send. Anon stays **select-only** — no insert, update, or delete policy.
+
+`localStorage` (`vo.portal.handoffs.v1`) is a cache and the offline fallback when the function cannot be reached. It is not the queue Hub polls.
+
+Optional public webhook (same JSON, after the queue write; never a service-role key):
 
 ```bash
 VITE_HANDOFF_WEBHOOK_URL=https://example.com/hooks/virtual-office
 ```
 
-`POST` JSON:
+JSON body (function payload, `payload` column, webhook body, and `vo-portal-handoff` detail):
 
 ```json
 {
@@ -77,7 +73,25 @@ VITE_HANDOFF_WEBHOOK_URL=https://example.com/hooks/virtual-office
 }
 ```
 
-The page also dispatches `vo-portal-handoff` on `window` with that object. To store a row, apply `sql/portal_handoffs.sql` from the webhook receiver using the service role. Anon stays **select-only**.
+Table `public.portal_handoffs`:
+
+| Column | Type | Maps to |
+| --- | --- | --- |
+| `id` | uuid | `id` |
+| `bot_id` | uuid | `bot.id` |
+| `lead_id` | uuid | `lead.id` |
+| `message` | text (1–500) | `message` |
+| `source` | text | `source` (`virtual-office` only) |
+| `payload` | jsonb | the object above |
+| `created_at` | timestamptz | `created_at` |
+
+Hub poll:
+
+```sql
+select id, created_at, bot_id, lead_id, message, source, payload
+from public.portal_handoffs
+order by created_at asc;
+```
 
 ### Lighting
 
