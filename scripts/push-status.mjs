@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
  * Example: push a bot_status row from a bot process.
- * Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (or anon with RLS insert policy).
- * Never commit secrets. Never used by the front-end Simulate Work button.
+ * Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.
+ * Anon key alone is not enough (RLS: select-only for anon; writes bypass RLS via service role).
+ * Never commit secrets. Never put SERVICE_ROLE in VITE_ vars or the front-end.
+ * Never used by the front-end Simulate Work button.
  *
  * Usage:
  *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
@@ -11,16 +13,13 @@
 import { createClient } from '@supabase/supabase-js';
 
 const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const key =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY;
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const [botId, state, ...rest] = process.argv.slice(2);
 const statusLine = rest.join(' ').slice(0, 80);
 
 if (!url || !key) {
-  console.error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or anon key).');
+  console.error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (service role required; anon key is not accepted).');
   process.exit(1);
 }
 if (!botId || !state) {

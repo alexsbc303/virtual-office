@@ -14,12 +14,11 @@ create policy "bot_status_select_anon"
   to anon
   using (true);
 
--- Writes: service role or a restricted insert/update policy for bot runners
--- Example (tighten to your auth model):
--- create policy "bot_status_upsert_authenticated"
---   on public.bot_status for all
---   to authenticated
---   using (true) with check (true);
+-- Writes must use SUPABASE_SERVICE_ROLE_KEY (bypasses RLS).
+-- Do NOT grant anon insert/update on bot_status.
+-- Drop legacy anon write policies if they exist from earlier schema:
+--   drop policy if exists bot_status_insert_anon on public.bot_status;
+--   drop policy if exists bot_status_update_anon on public.bot_status;
 
 -- Weekly usage board
 create table if not exists public.usage_snapshot (
@@ -36,19 +35,11 @@ create policy "usage_snapshot_select_anon"
   to anon
   using (true);
 
+-- Writes must use SUPABASE_SERVICE_ROLE_KEY (bypasses RLS).
+-- Do NOT grant anon insert/update on usage_snapshot.
+-- Drop legacy anon write policies if they exist from earlier schema:
+--   drop policy if exists usage_snapshot_insert_anon on public.usage_snapshot;
+
 -- Realtime
 alter publication supabase_realtime add table public.bot_status;
 alter publication supabase_realtime add table public.usage_snapshot;
-
--- Anon writes for bot runners / office routines (operational board; not secrets)
-do $$ begin
-  if not exists (select 1 from pg_policies where tablename='bot_status' and policyname='bot_status_insert_anon') then
-    create policy bot_status_insert_anon on public.bot_status for insert to anon with check (true);
-  end if;
-  if not exists (select 1 from pg_policies where tablename='bot_status' and policyname='bot_status_update_anon') then
-    create policy bot_status_update_anon on public.bot_status for update to anon using (true) with check (true);
-  end if;
-  if not exists (select 1 from pg_policies where tablename='usage_snapshot' and policyname='usage_snapshot_insert_anon') then
-    create policy usage_snapshot_insert_anon on public.usage_snapshot for insert to anon with check (true);
-  end if;
-end $$;
