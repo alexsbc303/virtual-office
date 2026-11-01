@@ -39,3 +39,16 @@ create policy "usage_snapshot_select_anon"
 -- Realtime
 alter publication supabase_realtime add table public.bot_status;
 alter publication supabase_realtime add table public.usage_snapshot;
+
+-- Anon writes for bot runners / office routines (operational board; not secrets)
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename='bot_status' and policyname='bot_status_insert_anon') then
+    create policy bot_status_insert_anon on public.bot_status for insert to anon with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename='bot_status' and policyname='bot_status_update_anon') then
+    create policy bot_status_update_anon on public.bot_status for update to anon using (true) with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename='usage_snapshot' and policyname='usage_snapshot_insert_anon') then
+    create policy usage_snapshot_insert_anon on public.usage_snapshot for insert to anon with check (true);
+  end if;
+end $$;
