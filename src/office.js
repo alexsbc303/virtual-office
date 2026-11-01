@@ -53,7 +53,7 @@ export const ZONES = [
   {
     id: 'focus',
     labelEn: 'Focus',
-    labelZh: '專注區',
+    labelZh: '專注',
     color: 0x8fbf7a,
     fill: 0xb8d9a8,
     x: -5.4,
@@ -64,7 +64,7 @@ export const ZONES = [
   {
     id: 'collaboration',
     labelEn: 'Collaboration',
-    labelZh: '協作區',
+    labelZh: '協作',
     color: 0x6aa8d8,
     fill: 0xa8cce8,
     x: -0.1,
@@ -75,7 +75,7 @@ export const ZONES = [
   {
     id: 'social',
     labelEn: 'Social',
-    labelZh: '休憩區',
+    labelZh: '社交',
     color: 0xd4a574,
     fill: 0xe8c9a0,
     x: 4.8,
@@ -86,7 +86,7 @@ export const ZONES = [
   {
     id: 'meeting',
     labelEn: 'Meeting',
-    labelZh: '會議室',
+    labelZh: '會議',
     color: 0x9b8bc4,
     fill: 0xc5b8e0,
     x: -5.6,
@@ -97,7 +97,7 @@ export const ZONES = [
   {
     id: 'phone',
     labelEn: 'Phone',
-    labelZh: '電話亭',
+    labelZh: '電話／對外',
     color: 0xd48aa8,
     fill: 0xe8b8c8,
     x: -1.4,
@@ -108,7 +108,7 @@ export const ZONES = [
   {
     id: 'reception',
     labelEn: 'Reception',
-    labelZh: '接待處',
+    labelZh: '接待',
     color: 0xa8a8a0,
     fill: 0xd8d4cc,
     x: 3.6,
@@ -119,38 +119,67 @@ export const ZONES = [
 ];
 
 /**
- * Desk / seat anchors — 11 Focus workstations + Lead at Reception.
+ * Desk / seat anchors by AS bot role × floor-plan zone (12 homes).
+ * Reception 1 · Focus 6 · Collaboration 3 · Phone 2. Meeting/Social are visit targets.
  */
 export function deskLayout() {
   const desks = new Map();
 
-  // Lead — Reception L-desk (faces entrance)
+  // Reception 接待 — Bot 總管 at L-desk
   desks.set(LEAD_ID, seatFromDesk(2.4, 4.2, 'reception', RECEPTION_CHAIR));
 
+  // Focus 專注 — 6 partitioned deep-work desks (2×3)
   const focusDesks = [
-    // Row nearer windows (−Z)
-    { id: '26fffc1c-3c69-4346-8a68-199db47277fd', x: -7.4, z: -5.2 },
-    { id: '4f070b62-ac92-4824-9953-886cda5433d1', x: -6.0, z: -5.2 },
-    { id: '28c84d63-5b73-4b78-aebc-3a2e02376fc2', x: -4.6, z: -5.2 },
-    { id: '2fb3b7e8-b556-45ea-8b10-1ced7f05c0b4', x: -3.2, z: -5.2 },
-    { id: '9f0fa493-9994-409c-b398-974b67de306e', x: -1.8, z: -5.2 },
-    // Second row
-    { id: 'aecd27e2-8d49-4c33-962c-cdfa1860fd26', x: -7.4, z: -3.0 },
-    { id: 'b7c9b07d-4a12-49af-bbdf-7fa19bdc96b2', x: -6.0, z: -3.0 },
-    { id: '5f8f09c0-fe3d-40a5-87c1-2fcc440bb9c3', x: -4.6, z: -3.0 },
-    { id: 'c7f037b0-0082-4290-a543-00f203e4c150', x: -3.2, z: -3.0 },
-    { id: '764c93f4-9330-4daa-9f86-481be3b19e60', x: -1.8, z: -3.0 },
-    // Overflow focus seat near collab edge
-    { id: '6a0dc819-57c2-4507-ae25-f3b3122c3f46', x: -7.4, z: -1.0 },
+    { id: 'b7c9b07d-4a12-49af-bbdf-7fa19bdc96b2', x: -7.2, z: -5.0 }, // Coding
+    { id: 'aecd27e2-8d49-4c33-962c-cdfa1860fd26', x: -5.6, z: -5.0 }, // Infrastructure
+    { id: '5f8f09c0-fe3d-40a5-87c1-2fcc440bb9c3', x: -4.0, z: -5.0 }, // assessment-validator
+    { id: 'c7f037b0-0082-4290-a543-00f203e4c150', x: -7.2, z: -2.8 }, // IT Security
+    { id: '6a0dc819-57c2-4507-ae25-f3b3122c3f46', x: -5.6, z: -2.8 }, // 報價與消費
+    { id: '764c93f4-9330-4daa-9f86-481be3b19e60', x: -4.0, z: -2.8 }, // Grok Bot Coach
   ];
   for (const d of focusDesks) {
     desks.set(d.id, seatFromDesk(d.x, d.z, 'focus'));
   }
+
+  // Collaboration 協作 — shared tables (face into table)
+  // North table (+Z side chairs face −Z); south table (−Z side chairs face +Z)
+  desks.set(
+    '26fffc1c-3c69-4346-8a68-199db47277fd', // Scheduler
+    seatFromDesk(-0.9, -5.0, 'collaboration', { offsetZ: 0.95, seatY: 0.45, faceYaw: Math.PI }),
+  );
+  desks.set(
+    '28c84d63-5b73-4b78-aebc-3a2e02376fc2', // 港式中英文寫作
+    seatFromDesk(0.7, -5.0, 'collaboration', { offsetZ: 0.95, seatY: 0.45, faceYaw: Math.PI }),
+  );
+  desks.set(
+    '2fb3b7e8-b556-45ea-8b10-1ced7f05c0b4', // 雙語會議紀錄
+    seatFromDesk(-0.1, -2.6, 'collaboration', { offsetZ: -0.95, seatY: 0.45, faceYaw: 0 }),
+  );
+
+  // Phone 電話／對外 — two booths
+  desks.set(
+    '4f070b62-ac92-4824-9953-886cda5433d1', // Lotus Notes
+    seatFromDesk(-1.95, 3.6, 'phone', { offsetZ: 0.45, seatY: 0.45, faceYaw: Math.PI }),
+  );
+  desks.set(
+    '9f0fa493-9994-409c-b398-974b67de306e', // 日程助理
+    seatFromDesk(-0.85, 3.6, 'phone', { offsetZ: 0.45, seatY: 0.45, faceYaw: Math.PI }),
+  );
+
   return desks;
 }
 
-/** Handoff meetup near reception desk front */
-export const LEAD_HANDOFF = { x: 2.4, y: CHAIR.seatY, z: 3.2 };
+/** Meeting 會議 — handoff / walk target at conference table */
+export const MEETING_HANDOFF = { x: -5.6, y: CHAIR.seatY, z: 3.6 };
+/** @deprecated alias — handoffs go to Meeting now */
+export const LEAD_HANDOFF = MEETING_HANDOFF;
+
+/** Social 社交 lounge visit spots (no permanent home seats) */
+export const SOCIAL_SPOTS = [
+  { x: 6.2, z: -3.4 },
+  { x: 7.2, z: -4.6 },
+  { x: 5.2, z: -2.6 },
+];
 
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({
@@ -288,17 +317,12 @@ export function buildOfficeScene(scene, _loader) {
 
   // ——— Focus Zone: desks with privacy partitions ———
   const focusPositions = [
-    [-7.4, -5.2],
-    [-6.0, -5.2],
-    [-4.6, -5.2],
-    [-3.2, -5.2],
-    [-1.8, -5.2],
-    [-7.4, -3.0],
-    [-6.0, -3.0],
-    [-4.6, -3.0],
-    [-3.2, -3.0],
-    [-1.8, -3.0],
-    [-7.4, -1.0],
+    [-7.2, -5.0],
+    [-5.6, -5.0],
+    [-4.0, -5.0],
+    [-7.2, -2.8],
+    [-5.6, -2.8],
+    [-4.0, -2.8],
   ];
   for (const [dx, dz] of focusPositions) {
     buildFocusDesk(root, dx, dz, wood, woodWarm, blackMetal, screenGlow, plant, pot, partitionMat);

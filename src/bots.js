@@ -6,7 +6,7 @@ import { TEAM, LEAD_ID } from './team.js';
 import { getEffectiveStatus } from './supabase.js';
 import { createNameTagCanvas } from './avatars.js';
 import { createFigure } from './figures.js';
-import { LEAD_HANDOFF, CHAIR } from './office.js';
+import { MEETING_HANDOFF, SOCIAL_SPOTS, CHAIR } from './office.js';
 
 /**
  * @param {THREE.Scene} scene
@@ -115,27 +115,47 @@ export function createBotManager(scene, desks, camera) {
     return name.slice(0, 13) + '…';
   }
 
-  /** Seated nestled on cushion (slightly toward desk, clear of backrest) */
-  function seated(desk) {
+  /** Nestle along faceYaw (toward desk when dist>0). */
+  function nestle(desk, dist) {
     const sx = desk.seatX ?? desk.x;
     const sz = desk.seatZ ?? desk.z + CHAIR.offsetZ;
-    return { x: sx, z: sz - 0.05 };
+    const yaw = desk.faceYaw ?? CHAIR.faceYaw;
+    return { x: sx + Math.sin(yaw) * dist, z: sz + Math.cos(yaw) * dist };
+  }
+
+  /** Seated nestled on cushion (slightly toward desk, clear of backrest) */
+  function seated(desk) {
+    return nestle(desk, 0.05);
   }
 
   /** Scoot toward keyboard / monitors while working */
   function working(desk) {
-    const sx = desk.seatX ?? desk.x;
-    const sz = desk.seatZ ?? desk.z + CHAIR.offsetZ;
-    return { x: sx, z: sz - 0.14 };
+    return nestle(desk, 0.14);
   }
 
-  function handoffTarget(id) {
-    if (id === LEAD_ID) {
-      const home = motion.get(id)?.home;
-      return { x: home.x, z: home.z };
-    }
-    // Scoot in wheeled chair toward lead (stay at seat height)
-    return { x: LEAD_HANDOFF.x, z: LEAD_HANDOFF.z };
+  /** Handoff → Meeting 會議 conference table */
+  function handoffTarget(_id) {
+    // Stagger seats around the meeting table so multiple handoffs don't stack
+    const slot = Math.abs(hashId(_id)) % 4;
+    const offsets = [
+      { x: -0.7, z: 0.7 },
+      { x: 0.7, z: 0.7 },
+      { x: -0.7, z: -0.5 },
+      { x: 0.7, z: -0.5 },
+    ];
+    const o = offsets[slot];
+    return { x: MEETING_HANDOFF.x + o.x, z: MEETING_HANDOFF.z + o.z };
+  }
+
+  function hashId(id) {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+    return h;
+  }
+
+  function socialVisitTarget(id) {
+    const spot = SOCIAL_SPOTS[Math.abs(hashId(id)) % SOCIAL_SPOTS.length];
+    return { x: spot.x, z: spot.z };
   }
 
   function startMove(id, target, duration, phase) {
@@ -162,11 +182,17 @@ export function createBotManager(scene, desks, camera) {
       m.state = vis.state;
 
       if (vis.state === 'idle') {
-        startMove(member.id, seated(desk), 2.2, 'to-seat');
+        // Mostly home; ~28% briefly visit Social lounge then return
+        const visit = Math.abs(hashId(member.id + String(Math.floor(Date.now() / 60000)))) % 100 < 28;
+        if (visit && member.id !== LEAD_ID) {
+          startMove(member.id, socialVisitTarget(member.id), 2.8, 'to-social');
+        } else {
+          startMove(member.id, seated(desk), 2.2, 'to-seat');
+        }
       } else if (vis.state === 'working') {
         startMove(member.id, working(desk), 1.2, 'to-desk');
       } else if (vis.state === 'handoff') {
-        startMove(member.id, handoffTarget(member.id), member.id === LEAD_ID ? 1.0 : 3.2, 'to-lead');
+        startMove(member.id, handoffTarget(member.id), 3.0, 'to-meeting');
       } else if (prev !== 'idle') {
         startMove(member.id, seated(desk), 2.2, 'to-seat');
         m.state = 'idle';
@@ -214,16 +240,23 @@ export function createBotManager(scene, desks, camera) {
         }
 
         if (m.t >= 1) {
-          if (m.phase === 'to-lead' && id !== LEAD_ID) {
+          if (m.phase === 'to-meeting') {
             const desk = desks.get(id);
             setTimeout(() => {
               if (motion.get(id)?.state === 'handoff') {
                 startMove(id, seated(desk), 3.2, 'returning');
               }
-            }, 1600);
+            }, 1800);
+          }
+          if (m.phase === 'to-social') {
+            const desk = desks.get(id);
+            setTimeout(() => {
+              if (motion.get(id)?.state === 'idle') {
+                startMove(id, seated(desk), 2.6, 'returning');
+              }
+            }, 2400);
           }
           if (m.phase === 'returning') {
-            m.state = 'idle';
             m.phase = 'idle';
           }
         }
@@ -248,12 +281,12 @@ export function createBotManager(scene, desks, camera) {
         bounce += Math.abs(Math.sin(b.bob * 3.4)) * 0.006;
       }
 
-      if (st.state === 'handoff' && !moving && id !== LEAD_ID) {
-        const dx = LEAD_HANDOFF.x - b.x;
-        const dz = LEAD_HANDOFF.z - 0.3 - b.z;
+      if (st.state === 'handoff' && !moving) {
+        const dx = MEETING_HANDOFF.x - b.x;
+        const dz = MEETING_HANDOFF.z - b.z;
         const desired = Math.atan2(dx, dz);
         b.facing = lerpAngle(b.facing, desired, Math.min(1, dt * 3));
-      } else if (!moving && (st.state === 'idle' || st.state === 'working')) {
+      } else if (!moving && (st.state === 'idle' || st.state === 'working') && m.phase !== 'to-social') {
         b.facing = lerpAngle(b.facing, b.homeFacing, Math.min(1, dt * 2.2));
       }
 
