@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="AS bot team virtual office — HKSAR departmental layout" />
+    <title>Virtual Office · 虛擬辦公室 | AS Virtual Office</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="auth-gate" class="auth-gate" aria-live="polite">
+      <div class="auth-card">
+        <h1>Virtual Office</h1>
+        <p class="auth-sub">虛擬辦公室 · Restricted Access</p>
+        <label for="office-password" class="auth-label">
+          Access Password
+          <span class="zh">通行密碼</span>
+        </label>
+        <input
+          id="office-password"
+          type="password"
+          autocomplete="current-password"
+          placeholder="Enter password"
+        />
+        <button id="auth-submit" type="button">Enter · 進入</button>
+        <p id="auth-error" class="auth-error" hidden>Incorrect password · 密碼不正確</p>
+      </div>
+    </div>
+
+    <div id="app" class="app" hidden>
+      <header class="top-bar">
+        <div class="brand">
+          <span class="brand-en">AS Virtual Office</span>
+          <span class="brand-zh">機電工程署機械人團隊 · 虛擬辦公室</span>
+        </div>
+        <div id="usage-board" class="usage-board" title="Weekly usage snapshot">
+          <div class="usage-en">Weekly usage: — · Reset: —</div>
+          <div class="usage-zh">本週用量：— · 重置：—</div>
+        </div>
+        <div id="feed-warning" class="feed-warning" hidden>
+          <span class="en">Status feed quiet &gt; 45 min</span>
+          <span class="zh">狀態饋送靜默超過 45 分鐘</span>
+        </div>
+      </header>
+
+      <canvas id="office-canvas"></canvas>
+
+      <aside id="hover-panel" class="hover-panel" hidden>
+        <div id="hover-name" class="hover-name"></div>
+        <div id="hover-dept" class="hover-dept"></div>
+        <div id="hover-status" class="hover-status"></div>
+      </aside>
+
+      <div id="sim-badge" class="sim-badge" hidden>
+        Simulation · 模擬中
+      </div>
+
+      <footer class="bottom-bar">
+        <button id="simulate-btn" type="button" class="sim-btn">
+          Simulate Work
+          <span class="zh">模擬工作</span>
+        </button>
+        <span class="legend">
+          Idle seated · Working at desk · Handoff to Directorate
+          <span class="zh">閒置就座 · 桌前工作 · 向總管室交接</span>
+        </span>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

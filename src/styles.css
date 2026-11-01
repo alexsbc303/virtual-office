@@ -1,0 +1,284 @@
+:root {
+  --bg: #e8ecef;
+  --panel: #f5f7f9;
+  --ink: #1a2332;
+  --muted: #5a6570;
+  --line: #c5ced6;
+  --accent: #1a237e;
+  --warn: #b71c1c;
+  --warn-bg: #fff3f0;
+  --font: "Noto Sans TC", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+body {
+  overflow: hidden;
+}
+
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #dfe6ec 0%, #c8d2dc 100%);
+  z-index: 100;
+}
+
+/* Author display beats the UA [hidden] rule unless !important. */
+.auth-gate[hidden] {
+  display: none !important;
+}
+
+.auth-card {
+  width: min(360px, 92vw);
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 2rem 1.75rem;
+  box-shadow: 0 8px 24px rgba(26, 35, 50, 0.08);
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.auth-sub {
+  margin: 0.35rem 0 1.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.auth-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.auth-label .zh {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+#office-password {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  font: inherit;
+  margin-bottom: 0.85rem;
+}
+
+#auth-submit {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#auth-submit:hover {
+  background: #0d1548;
+}
+
+.auth-error {
+  margin: 0.75rem 0 0;
+  color: var(--warn);
+  font-size: 0.8rem;
+}
+
+.app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+#office-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem 1.25rem;
+  padding: 0.65rem 1rem;
+  background: rgba(245, 247, 249, 0.92);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.brand-en {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.brand-zh {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.usage-board {
+  margin-left: auto;
+  text-align: right;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.usage-zh {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.feed-warning {
+  flex-basis: 100%;
+  background: var(--warn-bg);
+  border: 1px solid #ef9a9a;
+  color: var(--warn);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.78rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.hover-panel {
+  position: absolute;
+  z-index: 12;
+  min-width: 180px;
+  max-width: 280px;
+  padding: 0.65rem 0.75rem;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+  font-size: 0.8rem;
+}
+
+.hover-name {
+  font-weight: 650;
+  margin-bottom: 0.2rem;
+}
+
+.hover-dept {
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin-bottom: 0.35rem;
+}
+
+.hover-status {
+  font-size: 0.75rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.35rem;
+}
+
+.sim-badge {
+  position: absolute;
+  top: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 11;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  color: #5d4037;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.55rem 1rem;
+  background: rgba(245, 247, 249, 0.94);
+  border-top: 1px solid var(--line);
+}
+
+.sim-btn {
+  border: 1px solid var(--accent);
+  background: #fff;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+
+.sim-btn .zh {
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.sim-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sim-btn.active .zh {
+  color: #c5cae9;
+}
+
+.legend {
+  font-size: 0.72rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.legend .zh {
+  font-size: 0.68rem;
+}
+
+@media (max-width: 640px) {
+  .usage-board {
+    margin-left: 0;
+    text-align: left;
+  }
+  .legend {
+    display: none;
+  }
+}
