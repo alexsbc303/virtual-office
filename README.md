@@ -1,8 +1,10 @@
 # AS Virtual Office
 
-2D anime-style virtual office for the AS bot team.
+Polished **3D anime-style** virtual office for the AS bot team.
 
-Stack: **Vite + Canvas2D** static front-end with procedural anime avatar sprites.
+Stack: **Vite + Three.js** with soft Shinkai-like lighting, wood desks, glass
+meeting room, pantry, hanging plants, and industrial ceiling. Avatars are
+procedural anime sprite billboards (team colours) with status rings.
 Live presence via **Supabase Realtime** (`bot_status`, `usage_snapshot`).
 
 ## Quick start
@@ -15,6 +17,8 @@ npm run dev
 ```
 
 Open the printed local URL (`base: /virtual-office/`). Without Supabase credentials the office still loads; all bots remain idle until Realtime data arrives.
+
+Orbit / drag the view to feel depth. Soft auto-sway when idle.
 
 ### Password hash
 
@@ -41,6 +45,7 @@ npm run build
 
 ## Style
 
-Polished 2D anime office scene (illustrated background + sprite avatars) matching the
-attached anime reference: bright open office, floor-to-ceiling windows + city, glass
-meeting room, kitchenette, hanging plants, wood desks. Team colours accent hair/clothes.
+3D room framed like the anime reference: bright open-plan, floor-to-ceiling
+windows with city backdrop, warm wood desks, glass directorate room, kitchenette,
+hanging plants, industrial pipes and track lights. Soft warm window light +
+ACES tone mapping. Team colours accent avatar hair/clothes and name tags.

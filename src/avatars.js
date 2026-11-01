@@ -397,3 +397,34 @@ export function createAvatarBadge(member, index, size = 40) {
   ctx.drawImage(full, 28, 2, 72, 72, 0, 0, size, size);
   return c;
 }
+
+/**
+ * Compact name-tag canvas for 3D sprite billboards.
+ * @param {{ color: string, name: string }} member
+ */
+export function createNameTagCanvas(member) {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 64;
+  const ctx = c.getContext('2d');
+  const label = member.name.length > 16 ? member.name.slice(0, 15) + '…' : member.name;
+
+  ctx.fillStyle = 'rgba(255,253,249,0.94)';
+  roundRect(ctx, 4, 10, 248, 44, 10);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120,130,140,0.4)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = member.color;
+  ctx.beginPath();
+  ctx.arc(28, 32, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#2a3440';
+  ctx.font = '600 22px "Noto Sans TC", "Segoe UI", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, 48, 34);
+  return c;
+}

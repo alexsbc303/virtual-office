@@ -1,8 +1,16 @@
 /**
- * AS Virtual Office — 2D anime Canvas2D office (no Three.js).
+ * AS Virtual Office — polished Three.js anime-style 3D office.
  */
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { runPasswordGate } from './auth.js';
-import { buildOfficeBackground, deskLayout, SCENE_W, SCENE_H } from './office.js';
+import {
+  buildOfficeScene,
+  setupLighting,
+  createRenderer,
+  createCamera,
+} from './office.js';
 import { createBotManager } from './bots.js';
 import { TEAM } from './team.js';
 import {
@@ -129,52 +137,6 @@ function createStatusBoard() {
   return { refresh };
 }
 
-/**
- * Map canvas CSS pixels → scene coordinates, covering the view with letterboxing.
- */
-function createViewMapper(canvas) {
-  let scale = 1;
-  let offsetX = 0;
-  let offsetY = 0;
-  let cssW = 1;
-  let cssH = 1;
-
-  function resize() {
-    const parent = canvas.parentElement;
-    cssW = Math.max(1, parent?.clientWidth || window.innerWidth);
-    cssH = Math.max(1, parent?.clientHeight || window.innerHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.floor(cssW * dpr);
-    canvas.height = Math.floor(cssH * dpr);
-    canvas.style.width = `${cssW}px`;
-    canvas.style.height = `${cssH}px`;
-
-    // Cover mode — fill stage, may crop edges slightly
-    scale = Math.max(cssW / SCENE_W, cssH / SCENE_H);
-    offsetX = (cssW - SCENE_W * scale) / 2;
-    offsetY = (cssH - SCENE_H * scale) / 2;
-  }
-
-  function toScene(clientX, clientY) {
-    const rect = canvas.getBoundingClientRect();
-    const x = (clientX - rect.left - offsetX) / scale;
-    const y = (clientY - rect.top - offsetY) / scale;
-    return { x, y };
-  }
-
-  function apply(ctx) {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cssW, cssH);
-    ctx.fillStyle = '#ebe6df';
-    ctx.fillRect(0, 0, cssW, cssH);
-    ctx.translate(offsetX, offsetY);
-    ctx.scale(scale, scale);
-  }
-
-  return { resize, toScene, apply, get scale() { return scale; } };
-}
-
 async function boot() {
   await runPasswordGate();
 
@@ -189,13 +151,44 @@ async function boot() {
   const simBadge = document.getElementById('sim-badge');
 
   const statusBoard = createStatusBoard();
-  const background = buildOfficeBackground();
-  const desks = deskLayout();
-  const bots = createBotManager(desks);
-  const view = createViewMapper(canvas);
-  const ctx = canvas.getContext('2d');
 
-  view.resize();
+  const scene = new THREE.Scene();
+  setupLighting(scene);
+
+  const renderer = createRenderer(canvas);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  const parent = canvas.parentElement;
+  let w = Math.max(1, parent?.clientWidth || window.innerWidth);
+  let h = Math.max(1, parent?.clientHeight || window.innerHeight);
+  renderer.setSize(w, h, false);
+
+  const camera = createCamera(w / h);
+  const controls = new OrbitControls(camera, canvas);
+  controls.target.set(-1.5, 1.15, -0.2);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.07;
+  controls.minDistance = 7;
+  controls.maxDistance = 18;
+  controls.maxPolarAngle = Math.PI * 0.46;
+  controls.minPolarAngle = Math.PI * 0.22;
+  controls.enablePan = false;
+  controls.rotateSpeed = 0.45;
+  controls.update();
+
+  const loader = new THREE.TextureLoader();
+  const { desks } = buildOfficeScene(scene, loader);
+  const bots = createBotManager(scene, desks, camera);
+
+  function resize() {
+    w = Math.max(1, parent?.clientWidth || window.innerWidth);
+    h = Math.max(1, parent?.clientHeight || window.innerHeight);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+  }
+  window.addEventListener('resize', resize);
+  resize();
 
   function refreshUsageUI() {
     const u = getUsageSnapshot();
@@ -285,15 +278,13 @@ async function boot() {
   }
 
   canvas.addEventListener('pointermove', (e) => {
-    const { x, y } = view.toScene(e.clientX, e.clientY);
-    const member = bots.pickBot(x, y);
+    const member = bots.pickBot(canvas, e.clientX, e.clientY);
     showHover(member, e.clientX, e.clientY);
-    canvas.style.cursor = member ? 'pointer' : 'default';
+    canvas.style.cursor = member ? 'pointer' : 'grab';
   });
 
   canvas.addEventListener('pointerdown', (e) => {
-    const { x, y } = view.toScene(e.clientX, e.clientY);
-    const member = bots.pickBot(x, y);
+    const member = bots.pickBot(canvas, e.clientX, e.clientY);
     showHover(member, e.clientX, e.clientY);
   });
 
@@ -301,7 +292,34 @@ async function boot() {
     hoverPanel.hidden = true;
   });
 
-  window.addEventListener('resize', () => view.resize());
+  // Gentle idle camera sway (disabled while user orbits)
+  let userDriving = false;
+  let swayT = 0;
+  const basePos = camera.position.clone();
+  controls.addEventListener('start', () => {
+    userDriving = true;
+  });
+  controls.addEventListener('end', () => {
+    userDriving = false;
+    basePos.copy(camera.position);
+    swayT = 0;
+  });
+
+
+  window.addEventListener('vo-set-camera', (ev) => {
+    const mode = ev.detail?.mode;
+    if (mode === 'zones') {
+      camera.position.set(6.5, 3.8, 8.5);
+      controls.target.set(2.5, 1.2, -2.5);
+      basePos.copy(camera.position);
+      controls.update();
+    } else if (mode === 'overview') {
+      camera.position.set(9.2, 4.6, 10.2);
+      controls.target.set(-1.5, 1.15, -0.2);
+      basePos.copy(camera.position);
+      controls.update();
+    }
+  });
 
   let last = performance.now();
   function frame(now) {
@@ -309,10 +327,16 @@ async function boot() {
     const dt = Math.min((now - last) / 1000, 0.05);
     last = now;
     bots.update(dt);
+    controls.update();
 
-    view.apply(ctx);
-    ctx.drawImage(background, 0, 0);
-    bots.draw(ctx, getEffectiveStatus);
+    if (!userDriving) {
+      swayT += dt;
+      camera.position.x = basePos.x + Math.sin(swayT * 0.22) * 0.25;
+      camera.position.y = basePos.y + Math.sin(swayT * 0.17) * 0.08;
+      camera.lookAt(controls.target);
+    }
+
+    renderer.render(scene, camera);
   }
   requestAnimationFrame(frame);
 }
