@@ -1,11 +1,11 @@
 # AS Virtual Office
 
-Polished **3D anime-style** virtual office for the AS bot team.
+Polished **3D isometric virtual office** for the AS bot team (Dallas-style HUD chrome).
 
-Stack: **Vite + Three.js** with soft Shinkai-like lighting, wood desks, glass
-meeting room, pantry, hanging plants, and industrial ceiling. Bots appear as
-**cute procedural 3D rilakkuma-style plush figures** (all bots share the golden-brown
-relaxed-bear silhouette) seated at desks, with team-colour scarf accents, status rings, and name tags.
+Stack: **Vite + Three.js** cutaway office (wood floor, glass meeting room, lounge,
+kitchenette, plants, glowing monitors). Bots are **seated rilakkuma-style plush
+figures** with team-colour scarves/rings. Dark HUD: counters, team sidebar +
+activity feed, status legend, Day/Evening/Night lighting.
 Live presence via **Supabase Realtime** (`bot_status`, `usage_snapshot`).
 
 ## Quick start

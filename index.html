@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="AS Virtual Office — 3D anime-style virtual office for the AS bot team" />
-    <meta name="theme-color" content="#1a237e" />
+    <meta name="description" content="AS Virtual Office — 3D virtual office for the AS bot team" />
+    <meta name="theme-color" content="#0b1220" />
     <link rel="icon" type="image/png" href="./favicon.png" />
-    <title>Virtual Office · 虛擬辦公室 | AS Virtual Office</title>
+    <title>AS Virtual Office · 虛擬辦公室</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -38,45 +38,73 @@
     </div>
 
     <div id="app" class="app" hidden>
-      <header class="top-bar">
-        <div class="brand">
-          <span class="brand-en">AS Virtual Office</span>
-          <span class="brand-zh">AS 機械人團隊 · 虛擬辦公室</span>
-        </div>
-        <div id="usage-board" class="usage-board" title="Weekly usage snapshot">
-          <div class="usage-en">Weekly usage: — · Reset: —</div>
-          <div class="usage-zh">本週用量：— · 重置：—</div>
-        </div>
-        <div id="feed-warning" class="feed-warning" hidden>
-          <span class="en">Status feed quiet &gt; 45 min</span>
-          <span class="zh">狀態饋送靜默超過 45 分鐘</span>
-        </div>
-      </header>
-
       <div class="stage">
         <canvas id="office-canvas"></canvas>
 
-        <aside id="status-board" class="status-board" aria-label="Bot status board">
-          <div class="status-board-head">
+        <!-- Top-left HUD -->
+        <div class="hud-top">
+          <div class="hud-brand">
+            <span class="hud-title">AS Virtual Office</span>
+            <span id="sim-badge" class="sim-pill" hidden>Simulation</span>
+          </div>
+          <div id="hud-counters" class="hud-counters" aria-live="polite">
+            <span class="hud-chip"><i class="dot working"></i><b id="hud-working">0</b> working</span>
+            <span class="hud-chip"><i class="dot handoff"></i><b id="hud-handoff">0</b> handoff</span>
+            <span class="hud-chip"><i class="dot idle"></i><b id="hud-idle">12</b> idle</span>
+            <span class="hud-chip"><i class="dot free"></i><b id="hud-free">12</b> free desks</span>
+          </div>
+          <div id="feed-warning" class="feed-warning" hidden>
+            Status feed quiet &gt; 45 min · 狀態饋送靜默超過 45 分鐘
+          </div>
+          <div id="usage-board" class="usage-mini" title="Weekly usage snapshot">
+            <span class="usage-en">Weekly usage: —</span>
+          </div>
+        </div>
+
+        <!-- Right dark sidebar -->
+        <aside id="status-board" class="side-panel" aria-label="Team roster">
+          <div class="side-panel-head">
             <button
               type="button"
               id="status-board-toggle"
-              class="status-board-toggle"
+              class="side-toggle"
               aria-expanded="true"
-              aria-controls="status-list"
+              aria-controls="side-body"
             >
-              <span class="toggle-en">Status Board</span>
-              <span class="toggle-zh">狀態板</span>
+              <span class="side-toggle-title">Team · 團隊</span>
+              <span id="team-count" class="side-count">12</span>
               <span class="toggle-chevron" aria-hidden="true">▾</span>
             </button>
-            <div id="status-summary" class="status-summary">
-              <span class="sum-working">0 working</span>
-              <span class="sum-handoff">0 handoff</span>
-              <span class="sum-idle">12 idle</span>
+          </div>
+          <div id="side-body" class="side-body">
+            <ul id="status-list" class="team-list" role="list"></ul>
+            <div class="activity-block">
+              <div class="activity-head">Activity · 動態</div>
+              <ul id="activity-list" class="activity-list" role="list"></ul>
             </div>
           </div>
-          <ul id="status-list" class="status-list" role="list"></ul>
         </aside>
+
+        <!-- Bottom chrome -->
+        <div class="hud-bottom">
+          <div class="status-legend" aria-label="Status legend">
+            <span><i class="dot working"></i> Working · 工作中</span>
+            <span><i class="dot handoff"></i> Handoff · 交接</span>
+            <span><i class="dot idle"></i> Idle · 閒置</span>
+          </div>
+
+          <div class="time-toggle" role="group" aria-label="Lighting">
+            <button type="button" class="time-btn" data-light="now">Now</button>
+            <button type="button" class="time-btn active" data-light="day">Day</button>
+            <button type="button" class="time-btn" data-light="evening">Evening</button>
+            <button type="button" class="time-btn" data-light="night">Night</button>
+          </div>
+
+          <button id="simulate-btn" type="button" class="sim-btn">
+            Simulate Work
+            <span class="zh">模擬工作</span>
+          </button>
+        </div>
       </div>
 
       <aside id="hover-panel" class="hover-panel" hidden>
@@ -84,21 +112,6 @@
         <div id="hover-dept" class="hover-dept"></div>
         <div id="hover-status" class="hover-status"></div>
       </aside>
-
-      <div id="sim-badge" class="sim-badge" hidden>
-        Simulation · 模擬中
-      </div>
-
-      <footer class="bottom-bar">
-        <button id="simulate-btn" type="button" class="sim-btn">
-          Simulate Work
-          <span class="zh">模擬工作</span>
-        </button>
-        <span class="legend">
-          Idle seated · Working at desk · Handoff to Directorate
-          <span class="zh">閒置就座 · 桌前工作 · 向總管室交接</span>
-        </span>
-      </footer>
     </div>
 
     <script type="module" src="/src/main.js"></script>

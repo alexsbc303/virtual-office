@@ -4,7 +4,7 @@
  * hanging plants, industrial ceiling. Procedural anime city in windows.
  */
 import * as THREE from 'three';
-import { LEAD_ID } from './team.js';
+import { LEAD_ID, TEAM } from './team.js';
 import { createSkylineTexture } from './skyline.js';
 
 export const ROOM = { w: 18, d: 12, h: 4.2 };
@@ -155,8 +155,9 @@ export function buildOfficeScene(scene, loader) {
   const rugMat = mat(0x6a7684, { roughness: 0.96 });
   const sofaMat = mat(0x74808c, { roughness: 0.86 });
 
-  // Floor
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), floorMat);
+  // Wood plank floor
+  const woodFloorMat = makeWoodFloorMaterial();
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), woodFloorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   root.add(floor);
@@ -173,12 +174,7 @@ export function buildOfficeScene(scene, loader) {
   box(0.22, ROOM.h, ROOM.d, wall, ROOM.w / 2, ROOM.h / 2, 0, root);
 
   buildWindowWall(root, wall, glassMat);
-  // Ceiling
-  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), mat(0xfaf7f2, { roughness: 0.96 }));
-  ceil.rotation.x = Math.PI / 2;
-  ceil.position.set(0, ROOM.h, 0);
-  root.add(ceil);
-
+  // Cutaway / dollhouse: no solid ceiling (open roof feel). Light ducts only.
   buildCeilingGear(root, ductMat, metal, blackMetal);
 
   const deskPositions = [
@@ -234,7 +230,10 @@ export function buildOfficeScene(scene, loader) {
     root.add(bush);
   }
 
-  return { root, desks: deskLayout() };
+  const desks = deskLayout();
+  buildZoneOutlines(root, desks);
+
+  return { root, desks };
 }
 
 function buildWindowWall(root, wall, glassMat) {
@@ -421,9 +420,108 @@ function buildHangingPlant(root, x, z, plant, plantDark, pot, metal) {
   root.add(leaf3);
 }
 
+function makeWoodFloorMaterial() {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 512;
+  const g = c.getContext('2d');
+  g.fillStyle = '#d2b48c';
+  g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 16; i++) {
+    const y = i * 32;
+    g.fillStyle = i % 2 === 0 ? '#c9a87a' : '#d8bc96';
+    g.fillRect(0, y, 512, 32);
+    g.strokeStyle = 'rgba(120, 80, 40, 0.18)';
+    g.beginPath();
+    g.moveTo(0, y + 31);
+    g.lineTo(512, y + 31);
+    g.stroke();
+    // plank seams
+    for (let x = (i % 2) * 64; x < 512; x += 128) {
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x, y + 32);
+      g.stroke();
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(6, 4);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.82, metalness: 0.02 });
+}
+
+function buildZoneOutlines(root, desks) {
+  const byId = new Map(TEAM.map((m) => [m.id, m]));
+  for (const [id, desk] of desks) {
+    const member = byId.get(id);
+    if (!member) continue;
+    const color = new THREE.Color(member.color);
+    const w = desk.zone === 'lead' ? 2.2 : 1.7;
+    const d = desk.zone === 'lead' ? 2.0 : 1.55;
+    // Glowing floor rectangle (edges only via thin boxes)
+    const edgeMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const y = 0.02;
+    const cx = desk.x;
+    const cz = desk.z + 0.2;
+    const t = 0.035;
+    const hw = w / 2;
+    const hd = d / 2;
+    const mk = (bw, bd, x, z) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.012, bd), edgeMat.clone());
+      m.position.set(x, y, z);
+      root.add(m);
+    };
+    mk(w, t, cx, cz - hd);
+    mk(w, t, cx, cz + hd);
+    mk(t, d, cx - hw, cz);
+    mk(t, d, cx + hw, cz);
+
+    // Soft fill
+    const fill = new THREE.Mesh(
+      new THREE.PlaneGeometry(w - 0.08, d - 0.08),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.07, depthWrite: false }),
+    );
+    fill.rotation.x = -Math.PI / 2;
+    fill.position.set(cx, 0.015, cz);
+    root.add(fill);
+
+    // Zone label sprite (deptZh preferred, short)
+    const label = member.deptZh || member.deptEn;
+    const short = label.length > 8 ? label.slice(0, 7) + '…' : label;
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 256, 64);
+    ctx.font = '600 22px "Noto Sans TC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillText(short, 129, 34);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(short, 128, 32);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const spr = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }),
+    );
+    spr.scale.set(1.35, 0.34, 1);
+    spr.position.set(cx, 0.08, cz + hd + 0.15);
+    root.add(spr);
+  }
+}
+
+/**
+ * @returns {{ hemi: THREE.HemisphereLight, sun: THREE.DirectionalLight, fill: THREE.DirectionalLight, ambient: THREE.AmbientLight, points: THREE.PointLight[] }}
+ */
 export function setupLighting(scene) {
   scene.background = new THREE.Color(0xdfe8f2);
-  scene.fog = new THREE.Fog(0xdfe8f2, 18, 48);
+  scene.fog = new THREE.Fog(0xdfe8f2, 22, 55);
 
   const hemi = new THREE.HemisphereLight(0xfff1dd, 0x7e95ae, 0.95);
   scene.add(hemi);
@@ -446,13 +544,101 @@ export function setupLighting(scene) {
   fill.position.set(8, 9, -6);
   scene.add(fill);
 
-  scene.add(new THREE.AmbientLight(0xfff6ec, 0.4));
+  const ambient = new THREE.AmbientLight(0xfff6ec, 0.4);
+  scene.add(ambient);
 
+  const points = [];
   for (const [x, z, i] of [[-4, 2, 0.7], [0, 0.2, 0.6], [3.2, 2, 0.55], [-2, -3, 0.5], [5, -2, 0.45]]) {
     const p = new THREE.PointLight(0xffd6a0, i, 9, 2);
     p.position.set(x, 3.35, z);
     scene.add(p);
+    points.push(p);
   }
+
+  return { hemi, sun, fill, ambient, points };
+}
+
+/** @param {'now'|'day'|'evening'|'night'} mode */
+export function applyLightingMode(scene, lights, mode) {
+  let resolved = mode;
+  if (mode === 'now') {
+    const h = new Date().toLocaleString('en-US', { timeZone: 'Asia/Hong_Kong', hour: 'numeric', hour12: false });
+    const hour = Number(h);
+    if (hour >= 6 && hour < 16) resolved = 'day';
+    else if (hour >= 16 && hour < 20) resolved = 'evening';
+    else resolved = 'night';
+  }
+
+  const presets = {
+    day: {
+      bg: 0xdfe8f2,
+      fog: 0xdfe8f2,
+      hemiSky: 0xfff1dd,
+      hemiGround: 0x7e95ae,
+      hemiI: 0.95,
+      sunC: 0xffe0b0,
+      sunI: 2.6,
+      fillC: 0xb7cae0,
+      fillI: 0.55,
+      ambC: 0xfff6ec,
+      ambI: 0.4,
+      pointC: 0xffd6a0,
+      pointMul: 1,
+      exposure: 1.12,
+    },
+    evening: {
+      bg: 0xc4a484,
+      fog: 0xc4a484,
+      hemiSky: 0xffc9a0,
+      hemiGround: 0x6a5a78,
+      hemiI: 0.75,
+      sunC: 0xff8a4a,
+      sunI: 1.8,
+      fillC: 0x8a6aaa,
+      fillI: 0.4,
+      ambC: 0xffd0b0,
+      ambI: 0.35,
+      pointC: 0xffb070,
+      pointMul: 1.15,
+      exposure: 1.05,
+    },
+    night: {
+      bg: 0x0e1628,
+      fog: 0x0e1628,
+      hemiSky: 0x3a4a6a,
+      hemiGround: 0x1a2030,
+      hemiI: 0.35,
+      sunC: 0x6a8abb,
+      sunI: 0.35,
+      fillC: 0x405070,
+      fillI: 0.25,
+      ambC: 0x1a2438,
+      ambI: 0.25,
+      pointC: 0x7ec8ff,
+      pointMul: 1.6,
+      exposure: 0.95,
+    },
+  };
+  const p = presets[resolved] || presets.day;
+  scene.background = new THREE.Color(p.bg);
+  if (scene.fog) {
+    scene.fog.color.setHex(p.fog);
+  }
+  lights.hemi.color.setHex(p.hemiSky);
+  lights.hemi.groundColor.setHex(p.hemiGround);
+  lights.hemi.intensity = p.hemiI;
+  lights.sun.color.setHex(p.sunC);
+  lights.sun.intensity = p.sunI;
+  lights.fill.color.setHex(p.fillC);
+  lights.fill.intensity = p.fillI;
+  lights.ambient.color.setHex(p.ambC);
+  lights.ambient.intensity = p.ambI;
+  const base = [0.7, 0.6, 0.55, 0.5, 0.45];
+  lights.points.forEach((pt, i) => {
+    pt.color.setHex(p.pointC);
+    pt.intensity = (base[i] ?? 0.5) * p.pointMul;
+  });
+  return p.exposure;
 }
 
 export function createRenderer(canvas) {
@@ -471,10 +657,10 @@ export function createRenderer(canvas) {
   return renderer;
 }
 
-/** Cinematic corner camera matching the anime reference framing. */
+/** Elevated isometric / dollhouse cutaway framing. */
 export function createCamera(aspect) {
-  const camera = new THREE.PerspectiveCamera(40, aspect, 0.1, 80);
-  camera.position.set(9.2, 4.6, 10.2);
-  camera.lookAt(-1.8, 1.15, -0.2);
+  const camera = new THREE.PerspectiveCamera(38, aspect, 0.1, 80);
+  camera.position.set(11.5, 9.2, 11.8);
+  camera.lookAt(-0.5, 0.4, 0.2);
   return camera;
 }

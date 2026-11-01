@@ -1,5 +1,5 @@
 /**
- * AS Virtual Office — polished Three.js anime-style 3D office.
+ * AS Virtual Office — Dallas-style HUD chrome + seated rilakkuma figures.
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -8,6 +8,7 @@ import { runPasswordGate } from './auth.js';
 import {
   buildOfficeScene,
   setupLighting,
+  applyLightingMode,
   createRenderer,
   createCamera,
 } from './office.js';
@@ -33,54 +34,104 @@ function relativeTime(iso) {
   if (min < 60) return `${min}m ago`;
   const hr = Math.round(min / 60);
   if (hr < 48) return `${hr}h ago`;
-  const day = Math.round(hr / 24);
-  return `${day}d ago`;
+  return `${Math.round(hr / 24)}d ago`;
+}
+
+function formatClock(date = new Date()) {
+  try {
+    return date.toLocaleTimeString('en-HK', {
+      timeZone: 'Asia/Hong_Kong',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch {
+    return date.toLocaleTimeString();
+  }
 }
 
 function stateLabel(state) {
-  if (state === 'working') return { en: 'Working', short: 'WORK', cls: 'is-working' };
-  if (state === 'handoff') return { en: 'Handoff', short: 'HAND', cls: 'is-handoff' };
-  return { en: 'Idle', short: 'IDLE', cls: 'is-idle' };
+  if (state === 'working') return { en: 'Working', short: 'Working', cls: 'is-working' };
+  if (state === 'handoff') return { en: 'Handoff', short: 'Handoff', cls: 'is-handoff' };
+  return { en: 'Idle', short: 'Idle', cls: 'is-idle' };
 }
 
-function createStatusBoard() {
+function createActivityFeed() {
+  const list = document.getElementById('activity-list');
+  /** @type {{ t: number, text: string }[]} */
+  const items = [];
+  const max = 24;
+
+  function render() {
+    list.innerHTML = '';
+    if (!items.length) {
+      const li = document.createElement('li');
+      li.className = 'activity-empty';
+      li.textContent = 'Waiting for status updates…';
+      list.appendChild(li);
+      return;
+    }
+    for (const it of items) {
+      const li = document.createElement('li');
+      li.className = 'activity-item';
+      const time = document.createElement('span');
+      time.className = 'activity-time';
+      time.textContent = formatClock(new Date(it.t));
+      li.append(time, document.createTextNode(it.text));
+      list.appendChild(li);
+    }
+  }
+
+  function push(text) {
+    items.unshift({ t: Date.now(), text });
+    if (items.length > max) items.length = max;
+    render();
+  }
+
+  render();
+  return { push, render };
+}
+
+function createStatusBoard(activity) {
   const list = document.getElementById('status-list');
-  const summary = document.getElementById('status-summary');
   const board = document.getElementById('status-board');
   const toggle = document.getElementById('status-board-toggle');
+  const teamCount = document.getElementById('team-count');
   /** @type {Map<string, HTMLElement>} */
   const rows = new Map();
+  /** @type {Map<string, string>} */
+  const lastKey = new Map();
+
+  teamCount.textContent = String(TEAM.length);
 
   for (const member of TEAM) {
     const li = document.createElement('li');
-    li.className = 'status-row is-idle';
+    li.className = 'team-row is-idle';
     li.dataset.botId = member.id;
 
     const swatch = document.createElement('span');
-    swatch.className = 'status-swatch';
+    swatch.className = 'team-dot';
     swatch.style.background = member.color;
-    swatch.title = member.color;
 
     const main = document.createElement('div');
-    main.className = 'status-main';
+    main.className = 'team-main';
     const name = document.createElement('div');
-    name.className = 'status-name';
+    name.className = 'team-name';
     name.textContent = member.name;
     const dept = document.createElement('div');
-    dept.className = 'status-dept';
+    dept.className = 'team-dept';
     dept.textContent = `${member.deptEn} · ${member.deptZh}`;
     const line = document.createElement('div');
-    line.className = 'status-line';
+    line.className = 'team-line';
     line.hidden = true;
     main.append(name, dept, line);
 
     const meta = document.createElement('div');
-    meta.className = 'status-meta';
+    meta.className = 'team-meta';
     const stateEl = document.createElement('span');
-    stateEl.className = 'status-state';
-    stateEl.textContent = 'IDLE';
+    stateEl.className = 'team-state';
+    stateEl.innerHTML = '<i class="dot idle"></i>Idle';
     const ago = document.createElement('span');
-    ago.className = 'status-ago';
+    ago.className = 'team-ago';
     ago.textContent = '—';
     meta.append(stateEl, ago);
 
@@ -91,7 +142,6 @@ function createStatusBoard() {
 
   board.classList.remove('collapsed');
   toggle.setAttribute('aria-expanded', 'true');
-
   toggle.addEventListener('click', () => {
     const collapsed = board.classList.toggle('collapsed');
     toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
@@ -110,28 +160,45 @@ function createStatusBoard() {
       li.classList.remove('is-working', 'is-handoff', 'is-idle');
       li.classList.add(info.cls);
 
-      const stateEl = li.querySelector('.status-state');
-      const ago = li.querySelector('.status-ago');
-      const line = li.querySelector('.status-line');
-      stateEl.textContent = info.short;
+      const stateEl = li.querySelector('.team-state');
+      const ago = li.querySelector('.team-ago');
+      const line = li.querySelector('.team-line');
+      const dotCls = st.state === 'working' ? 'working' : st.state === 'handoff' ? 'handoff' : 'idle';
+      stateEl.innerHTML = `<i class="dot ${dotCls}"></i>${info.short}`;
       ago.textContent = relativeTime(st.updatedAt);
 
-      if (st.line) {
+      const lineText = st.line ? (st.simulated ? `[SIM] ${st.line}` : st.line) : '';
+      if (lineText) {
         line.hidden = false;
-        line.textContent = st.simulated ? `[SIM] ${st.line}` : st.line;
+        line.textContent = lineText;
       } else {
         line.hidden = true;
         line.textContent = '';
       }
+
+      const key = `${st.state}|${lineText}`;
+      const prev = lastKey.get(member.id);
+      if (prev != null && prev !== key) {
+        const verb =
+          st.state === 'working'
+            ? lineText || 'started working'
+            : st.state === 'handoff'
+              ? lineText || 'started handoff'
+              : 'went idle';
+        activity.push(`${member.name}: ${verb}`);
+      }
+      lastKey.set(member.id, key);
 
       if (st.state === 'working') working += 1;
       else if (st.state === 'handoff') handoff += 1;
       else idle += 1;
     }
 
-    summary.querySelector('.sum-working').textContent = `${working} working`;
-    summary.querySelector('.sum-handoff').textContent = `${handoff} handoff`;
-    summary.querySelector('.sum-idle').textContent = `${idle} idle`;
+    document.getElementById('hud-working').textContent = String(working);
+    document.getElementById('hud-handoff').textContent = String(handoff);
+    document.getElementById('hud-idle').textContent = String(idle);
+    // Free desks ≈ idle seats (bots at desks but not busy)
+    document.getElementById('hud-free').textContent = String(idle);
   }
 
   return { refresh };
@@ -150,10 +217,11 @@ async function boot() {
   const simBtn = document.getElementById('simulate-btn');
   const simBadge = document.getElementById('sim-badge');
 
-  const statusBoard = createStatusBoard();
+  const activity = createActivityFeed();
+  const statusBoard = createStatusBoard(activity);
 
   const scene = new THREE.Scene();
-  setupLighting(scene);
+  const lights = setupLighting(scene);
 
   const renderer = createRenderer(canvas);
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -165,20 +233,34 @@ async function boot() {
 
   const camera = createCamera(w / h);
   const controls = new OrbitControls(camera, canvas);
-  controls.target.set(-1.5, 1.15, -0.2);
+  controls.target.set(-0.5, 0.4, 0.2);
   controls.enableDamping = true;
   controls.dampingFactor = 0.07;
-  controls.minDistance = 7;
-  controls.maxDistance = 18;
-  controls.maxPolarAngle = Math.PI * 0.46;
-  controls.minPolarAngle = Math.PI * 0.22;
+  controls.minDistance = 10;
+  controls.maxDistance = 24;
+  controls.maxPolarAngle = Math.PI * 0.42;
+  controls.minPolarAngle = Math.PI * 0.18;
   controls.enablePan = false;
-  controls.rotateSpeed = 0.45;
+  controls.rotateSpeed = 0.4;
   controls.update();
 
   const loader = new THREE.TextureLoader();
   const { desks } = buildOfficeScene(scene, loader);
   const bots = createBotManager(scene, desks, camera);
+
+  // Lighting toggle
+  let lightMode = 'day';
+  const timeBtns = [...document.querySelectorAll('.time-btn')];
+  function setLightMode(mode) {
+    lightMode = mode;
+    timeBtns.forEach((b) => b.classList.toggle('active', b.dataset.light === mode));
+    const exposure = applyLightingMode(scene, lights, mode);
+    renderer.toneMappingExposure = exposure;
+  }
+  timeBtns.forEach((btn) => {
+    btn.addEventListener('click', () => setLightMode(btn.dataset.light || 'day'));
+  });
+  setLightMode('day');
 
   function resize() {
     w = Math.max(1, parent?.clientWidth || window.innerWidth);
@@ -193,27 +275,12 @@ async function boot() {
   function refreshUsageUI() {
     const u = getUsageSnapshot();
     const en = usageBoard.querySelector('.usage-en');
-    const zh = usageBoard.querySelector('.usage-zh');
     if (u.used_pct == null) {
-      en.textContent = 'Weekly usage: — · Reset: —';
-      zh.textContent = '本週用量：— · 重置：—';
+      en.textContent = 'Weekly usage: —';
       return;
     }
     const left = Math.max(0, 100 - Number(u.used_pct));
-    let resetLabel = '—';
-    if (u.reset_at) {
-      try {
-        resetLabel = new Date(u.reset_at).toLocaleString('en-HK', {
-          timeZone: 'Asia/Hong_Kong',
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        });
-      } catch {
-        resetLabel = u.reset_at;
-      }
-    }
-    en.textContent = `Weekly usage left: ${left.toFixed(1)}% · Reset: ${resetLabel}`;
-    zh.textContent = `本週剩餘用量：${left.toFixed(1)}% · 重置：${resetLabel}`;
+    en.textContent = `Weekly usage left: ${left.toFixed(1)}%`;
   }
 
   function refreshFeedWarning() {
@@ -223,6 +290,7 @@ async function boot() {
   function setSimChrome(on) {
     simBadge.hidden = !on;
     simBtn.classList.toggle('active', on);
+    simBtn.childNodes[0].textContent = on ? 'Stop Simulation' : 'Simulate Work';
   }
 
   function refreshAll() {
@@ -232,13 +300,9 @@ async function boot() {
     refreshFeedWarning();
   }
 
-  onStatusChange(() => {
-    refreshAll();
-  });
-
+  onStatusChange(() => refreshAll());
   await startStatusFeed();
   refreshAll();
-
   setInterval(() => statusBoard.refresh(), 15_000);
 
   simBtn.addEventListener('click', () => {
@@ -251,7 +315,9 @@ async function boot() {
     startSimulation(setSimChrome);
     refreshAll();
   }
-
+  if (params.get('light')) {
+    setLightMode(params.get('light'));
+  }
 
   function showHover(member, clientX, clientY) {
     if (!member) {
@@ -283,36 +349,27 @@ async function boot() {
     showHover(member, e.clientX, e.clientY);
     canvas.style.cursor = member ? 'pointer' : 'grab';
   });
-
   canvas.addEventListener('pointerdown', (e) => {
     const member = bots.pickBot(canvas, e.clientX, e.clientY);
     showHover(member, e.clientX, e.clientY);
   });
-
   canvas.addEventListener('pointerleave', () => {
     hoverPanel.hidden = true;
   });
 
-  // Gentle idle camera sway (disabled while user orbits)
   let userDriving = false;
   let swayT = 0;
   const basePos = camera.position.clone();
 
-  // Deterministic camera presets for screenshots / deep links
-  const cam = new URLSearchParams(window.location.search).get('cam');
+  const cam = params.get('cam');
   if (cam === 'closeup') {
-    camera.position.set(1.4, 1.65, 4.6);
-    controls.target.set(-3.4, 0.95, 3.0);
+    camera.position.set(2.2, 3.2, 6.5);
+    controls.target.set(-3.2, 0.7, 2.8);
     basePos.copy(camera.position);
     controls.update();
   } else if (cam === 'lead') {
-    camera.position.set(6.0, 2.1, 0.3);
-    controls.target.set(3.2, 0.95, -2.2);
-    basePos.copy(camera.position);
-    controls.update();
-  } else if (cam === 'zones') {
-    camera.position.set(6.5, 3.8, 8.5);
-    controls.target.set(2.5, 1.2, -2.5);
+    camera.position.set(7.2, 4.2, 2.4);
+    controls.target.set(3.2, 0.8, -2.2);
     basePos.copy(camera.position);
     controls.update();
   }
@@ -326,17 +383,11 @@ async function boot() {
     swayT = 0;
   });
 
-
   window.addEventListener('vo-set-camera', (ev) => {
     const mode = ev.detail?.mode;
-    if (mode === 'zones') {
-      camera.position.set(6.5, 3.8, 8.5);
-      controls.target.set(2.5, 1.2, -2.5);
-      basePos.copy(camera.position);
-      controls.update();
-    } else if (mode === 'overview') {
-      camera.position.set(9.2, 4.6, 10.2);
-      controls.target.set(-1.5, 1.15, -0.2);
+    if (mode === 'overview') {
+      camera.position.set(11.5, 9.2, 11.8);
+      controls.target.set(-0.5, 0.4, 0.2);
       basePos.copy(camera.position);
       controls.update();
     }
@@ -349,14 +400,12 @@ async function boot() {
     last = now;
     bots.update(dt);
     controls.update();
-
     if (!userDriving) {
       swayT += dt;
-      camera.position.x = basePos.x + Math.sin(swayT * 0.22) * 0.25;
-      camera.position.y = basePos.y + Math.sin(swayT * 0.17) * 0.08;
+      camera.position.x = basePos.x + Math.sin(swayT * 0.18) * 0.2;
+      camera.position.y = basePos.y + Math.sin(swayT * 0.14) * 0.06;
       camera.lookAt(controls.target);
     }
-
     renderer.render(scene, camera);
   }
   requestAnimationFrame(frame);
