@@ -6,7 +6,7 @@ import { TEAM, LEAD_ID } from './team.js';
 import { getEffectiveStatus } from './supabase.js';
 import { createNameTagCanvas } from './avatars.js';
 import { createFigure } from './figures.js';
-import { MEETING_HANDOFF, SOCIAL_SPOTS, CHAIR } from './office.js';
+import { MEETING_HANDOFF, assignHuddleSeats, SOCIAL_SPOTS, CHAIR } from './office.js';
 
 /**
  * @param {THREE.Scene} scene
@@ -107,6 +107,8 @@ export function createBotManager(scene, desks, camera) {
       duration: 1,
       phase: 'idle',
       home: { x: seatX, z: seatZ },
+      seatKey: '',
+      faceYaw: faceYaw,
     });
   });
 
@@ -169,17 +171,43 @@ export function createBotManager(scene, desks, camera) {
     m.phase = phase;
   }
 
+  function huddleSeatMap() {
+    const entries = [];
+    for (const member of TEAM) {
+      const vis = getEffectiveStatus(member.id);
+      if (vis.state !== 'huddle') continue;
+      entries.push({ id: member.id, roomId: vis.roomId || '', simulated: !!vis.simulated });
+    }
+    return assignHuddleSeats(entries);
+  }
+
   function syncFromStatus() {
+    const huddleSeats = huddleSeatMap();
     for (const member of TEAM) {
       const vis = getEffectiveStatus(member.id);
       const m = motion.get(member.id);
       const desk = desks.get(member.id);
       if (!m || !desk) continue;
 
+      // Huddle sits in an assigned chair and stays. Re-target only when the
+      // seat changes (room membership). Do not use handoff's short visit.
+      if (vis.state === 'huddle') {
+        const seat = huddleSeats.get(member.id);
+        if (!seat) continue;
+        const seatKey = `${vis.roomId || ''}:${seat.index}`;
+        if (m.state === 'huddle' && m.seatKey === seatKey && m.phase !== 'returning') continue;
+        m.state = 'huddle';
+        m.seatKey = seatKey;
+        m.faceYaw = seat.yaw;
+        startMove(member.id, { x: seat.x, z: seat.z }, 3.2, 'to-huddle');
+        continue;
+      }
+
       if (vis.state === m.state && m.phase !== 'returning') continue;
 
       const prev = m.state;
       m.state = vis.state;
+      m.seatKey = '';
 
       if (vis.state === 'idle') {
         // Mostly home; ~28% briefly visit Social lounge then return
@@ -192,7 +220,10 @@ export function createBotManager(scene, desks, camera) {
       } else if (vis.state === 'working') {
         startMove(member.id, working(desk), 1.2, 'to-desk');
       } else if (vis.state === 'handoff') {
+        // Short temporary visit. Auto-return stays on phase 'to-meeting' only.
         startMove(member.id, handoffTarget(member.id), 3.0, 'to-meeting');
+      } else if (vis.state === 'waiting' || vis.state === 'error' || vis.state === 'done') {
+        startMove(member.id, seated(desk), 2.2, 'to-seat');
       } else if (prev !== 'idle') {
         startMove(member.id, seated(desk), 2.2, 'to-seat');
         m.state = 'idle';
@@ -207,6 +238,8 @@ export function createBotManager(scene, desks, camera) {
   function ringColor(state) {
     if (state === 'working') return 0x2e7d32;
     if (state === 'handoff') return 0xe65100;
+    if (state === 'huddle') return 0x7c4dff;
+    if (state === 'error') return 0xc62828;
     return 0x78909c;
   }
 
@@ -214,7 +247,10 @@ export function createBotManager(scene, desks, camera) {
     let diff = b - a;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    return a + diff * t;
+    let next = a + diff * t;
+    while (next > Math.PI) next -= Math.PI * 2;
+    while (next < -Math.PI) next += Math.PI * 2;
+    return next;
   }
 
   function update(dt) {
@@ -240,6 +276,10 @@ export function createBotManager(scene, desks, camera) {
         }
 
         if (m.t >= 1) {
+          if (m.phase === 'to-huddle') {
+            // Stay seated. Huddle does not schedule the handoff return.
+            m.phase = 'in-huddle';
+          }
           if (m.phase === 'to-meeting') {
             const desk = desks.get(id);
             setTimeout(() => {
@@ -264,13 +304,15 @@ export function createBotManager(scene, desks, camera) {
 
       const st = getEffectiveStatus(id);
 
-      // Gentle seated sway / work typing bob / handoff bounce
+      // Gentle seated sway / work typing bob / handoff bounce / huddle stay
       let bounce =
         st.state === 'working'
           ? Math.sin(b.bob * 5) * 0.012
           : st.state === 'handoff'
             ? Math.sin(b.bob * 5.5) * 0.03
-            : Math.sin(b.bob * 1.4) * 0.01;
+            : st.state === 'huddle'
+              ? Math.sin(b.bob * 1.8) * 0.012
+              : Math.sin(b.bob * 1.4) * 0.01;
 
       let leanX = 0;
       let armBob = 0;
@@ -281,12 +323,19 @@ export function createBotManager(scene, desks, camera) {
         bounce += Math.abs(Math.sin(b.bob * 3.4)) * 0.006;
       }
 
-      if (st.state === 'handoff' && !moving) {
+      if (st.state === 'huddle' && !moving) {
+        const yaw = m.faceYaw ?? b.homeFacing;
+        b.facing = lerpAngle(b.facing, yaw, Math.min(1, dt * 3));
+      } else if (st.state === 'handoff' && !moving) {
         const dx = MEETING_HANDOFF.x - b.x;
         const dz = MEETING_HANDOFF.z - b.z;
         const desired = Math.atan2(dx, dz);
         b.facing = lerpAngle(b.facing, desired, Math.min(1, dt * 3));
-      } else if (!moving && (st.state === 'idle' || st.state === 'working') && m.phase !== 'to-social') {
+      } else if (
+        !moving &&
+        (st.state === 'idle' || st.state === 'working' || st.state === 'waiting' || st.state === 'error' || st.state === 'done') &&
+        m.phase !== 'to-social'
+      ) {
         b.facing = lerpAngle(b.facing, b.homeFacing, Math.min(1, dt * 2.2));
       }
 

@@ -19,6 +19,7 @@ import {
   onStatusChange,
   getEffectiveStatus,
   getUsageSnapshot,
+  getFeedConnection,
   isFeedQuiet,
 } from './supabase.js';
 import { toggleSimulation, startSimulation } from './simulate.js';
@@ -50,9 +51,22 @@ function formatClock(date = new Date()) {
 }
 
 function stateLabel(state) {
-  if (state === 'working') return { en: 'Working', short: 'Working', cls: 'is-working' };
-  if (state === 'handoff') return { en: 'Handoff', short: 'Handoff', cls: 'is-handoff' };
-  return { en: 'Idle', short: 'Idle', cls: 'is-idle' };
+  if (state === 'working') return { en: 'Working', short: 'Working', cls: 'is-working', dot: 'working' };
+  if (state === 'handoff') return { en: 'Handoff', short: 'Handoff', cls: 'is-handoff', dot: 'handoff' };
+  if (state === 'huddle') return { en: 'Huddle', short: 'Huddle', cls: 'is-huddle', dot: 'huddle' };
+  if (state === 'waiting') return { en: 'Waiting', short: 'Waiting', cls: 'is-waiting', dot: 'idle' };
+  if (state === 'error') return { en: 'Error', short: 'Error', cls: 'is-error', dot: 'error' };
+  if (state === 'done') return { en: 'Done', short: 'Done', cls: 'is-done', dot: 'idle' };
+  return { en: 'Idle', short: 'Idle', cls: 'is-idle', dot: 'idle' };
+}
+
+function displayLine(st) {
+  const parts = [];
+  if (st.line) parts.push(st.line);
+  if (st.state === 'huddle' && st.roomLabel && st.roomLabel !== st.line) parts.push(st.roomLabel);
+  let text = parts.join(' · ');
+  if (st.simulated) text = text ? `[SIM] ${text}` : '[SIM]';
+  return text;
 }
 
 function createActivityFeed() {
@@ -150,6 +164,7 @@ function createStatusBoard(activity) {
   function refresh() {
     let working = 0;
     let handoff = 0;
+    let huddle = 0;
     let idle = 0;
 
     for (const member of TEAM) {
@@ -157,17 +172,17 @@ function createStatusBoard(activity) {
       const li = rows.get(member.id);
       if (!li) continue;
       const info = stateLabel(st.state);
-      li.classList.remove('is-working', 'is-handoff', 'is-idle');
+      li.classList.remove('is-working', 'is-handoff', 'is-huddle', 'is-idle', 'is-waiting', 'is-error', 'is-done');
       li.classList.add(info.cls);
 
       const stateEl = li.querySelector('.team-state');
       const ago = li.querySelector('.team-ago');
       const line = li.querySelector('.team-line');
-      const dotCls = st.state === 'working' ? 'working' : st.state === 'handoff' ? 'handoff' : 'idle';
-      stateEl.innerHTML = `<i class="dot ${dotCls}"></i>${info.short}`;
+      const short = st.simulated && st.state === 'huddle' ? 'Huddle SIM' : info.short;
+      stateEl.innerHTML = `<i class="dot ${info.dot}"></i>${short}`;
       ago.textContent = relativeTime(st.updatedAt);
 
-      const lineText = st.line ? (st.simulated ? `[SIM] ${st.line}` : st.line) : '';
+      const lineText = displayLine(st);
       if (lineText) {
         line.hidden = false;
         line.textContent = lineText;
@@ -176,7 +191,7 @@ function createStatusBoard(activity) {
         line.textContent = '';
       }
 
-      const key = `${st.state}|${lineText}`;
+      const key = `${st.state}|${lineText}|${st.simulated ? 'sim' : 'live'}`;
       const prev = lastKey.get(member.id);
       if (prev != null && prev !== key) {
         const verb =
@@ -184,20 +199,30 @@ function createStatusBoard(activity) {
             ? lineText || 'started working'
             : st.state === 'handoff'
               ? lineText || 'started handoff'
-              : 'went idle';
+              : st.state === 'huddle'
+                ? lineText || 'joined huddle'
+                : st.state === 'waiting'
+                  ? lineText || 'waiting'
+                  : st.state === 'error'
+                    ? lineText || 'error'
+                    : st.state === 'done'
+                      ? lineText || 'done'
+                      : 'went idle';
         activity.push(`${member.name}: ${verb}`);
       }
       lastKey.set(member.id, key);
 
       if (st.state === 'working') working += 1;
       else if (st.state === 'handoff') handoff += 1;
+      else if (st.state === 'huddle') huddle += 1;
       else idle += 1;
     }
 
     document.getElementById('hud-working').textContent = String(working);
+    document.getElementById('hud-huddle').textContent = String(huddle);
     document.getElementById('hud-handoff').textContent = String(handoff);
     document.getElementById('hud-idle').textContent = String(idle);
-    // Free desks ≈ idle seats (bots at desks but not busy)
+    // Free desks ≈ seated and not in a meeting (idle, waiting, error, done)
     document.getElementById('hud-free').textContent = String(idle);
   }
 
@@ -214,6 +239,7 @@ async function boot() {
   const hoverStatus = document.getElementById('hover-status');
   const usageBoard = document.getElementById('usage-board');
   const feedWarning = document.getElementById('feed-warning');
+  const feedConn = document.getElementById('feed-conn');
   const simBtn = document.getElementById('simulate-btn');
   const simBadge = document.getElementById('sim-badge');
 
@@ -287,6 +313,19 @@ async function boot() {
     feedWarning.hidden = !isFeedQuiet();
   }
 
+  function refreshFeedConnection() {
+    const state = getFeedConnection();
+    const label = {
+      connected: 'Feed · connected',
+      reconnecting: 'Feed · reconnecting',
+      error: 'Feed · error',
+      connecting: 'Feed · connecting',
+      offline: 'Feed · offline',
+    };
+    feedConn.dataset.state = state;
+    feedConn.textContent = label[state] || label.offline;
+  }
+
   function setSimChrome(on) {
     simBadge.hidden = !on;
     simBtn.classList.toggle('active', on);
@@ -298,12 +337,19 @@ async function boot() {
     statusBoard.refresh();
     refreshUsageUI();
     refreshFeedWarning();
+    refreshFeedConnection();
   }
 
   onStatusChange(() => refreshAll());
   await startStatusFeed();
   refreshAll();
-  setInterval(() => statusBoard.refresh(), 15_000);
+  // Re-check stale huddle/working even when no new Realtime row arrives.
+  setInterval(() => {
+    bots.syncFromStatus();
+    statusBoard.refresh();
+    refreshFeedWarning();
+    refreshFeedConnection();
+  }, 15_000);
 
   simBtn.addEventListener('click', () => {
     toggleSimulation(setSimChrome);
@@ -327,13 +373,17 @@ async function boot() {
     const st = getEffectiveStatus(member.id);
     hoverName.textContent = member.name;
     hoverDept.textContent = `${member.deptEn} · ${member.deptZh}`;
-    const stateText =
-      st.state === 'working'
-        ? 'Working · 工作中'
-        : st.state === 'handoff'
-          ? 'Handoff · 交接中'
-          : 'Idle · 閒置';
-    hoverStatus.textContent = st.line ? `${stateText} — ${st.line}` : stateText;
+    const stateText = {
+      working: 'Working · 工作中',
+      handoff: 'Handoff · 交接中',
+      huddle: 'Huddle · 會議中',
+      waiting: 'Waiting · 等待',
+      error: 'Error · 錯誤',
+      done: 'Done · 完成',
+      idle: 'Idle · 閒置',
+    }[st.state] || 'Idle · 閒置';
+    const lineText = displayLine(st);
+    hoverStatus.textContent = lineText ? `${stateText} — ${lineText}` : stateText;
     hoverPanel.hidden = false;
     const pad = 12;
     let x = clientX + pad;
@@ -374,6 +424,7 @@ async function boot() {
     lead: { pos: [8.5, 5.5, 10.5], target: [4.0, 0.6, 3.5] },
     reception: { pos: [8.5, 5.5, 10.5], target: [4.0, 0.6, 3.5] },
     overview: { pos: [12.5, 11.5, 13.5], target: [0.2, 0.3, 0.2] },
+    meeting: { pos: [-5.7, 11.4, 8.4], target: [-5.6, 0.2, 3.3] },
   };
   if (cam && camPresets[cam]) {
     const p = camPresets[cam];
