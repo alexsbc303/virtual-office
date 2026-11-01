@@ -33,11 +33,13 @@ export function createBotManager(scene, desks, camera) {
     const { root: figure, figureType, height, arms, head } = createFigure(member, index);
 
     const desk = desks.get(member.id);
-    const seatX = desk?.seatX ?? desk?.x ?? 0;
-    const rawSeatZ = desk?.seatZ ?? (desk ? desk.z + CHAIR.offsetZ : 0);
-    const seatZ = rawSeatZ - 0.05; // nestle toward desk
-    const seatY = desk?.seatY ?? CHAIR.seatY;
     const faceYaw = desk?.faceYaw ?? CHAIR.faceYaw;
+    const rawSeatX = desk?.seatX ?? desk?.x ?? 0;
+    const rawSeatZ = desk?.seatZ ?? (desk ? desk.z + CHAIR.offsetZ : 0);
+    // Same step as seated(): a short scoot along faceYaw, toward the desk.
+    const seatX = rawSeatX + Math.sin(faceYaw) * 0.05;
+    const seatZ = rawSeatZ + Math.cos(faceYaw) * 0.05;
+    const seatY = desk?.seatY ?? CHAIR.seatY;
 
     figure.position.set(seatX, seatY, seatZ);
     figure.rotation.y = faceYaw;

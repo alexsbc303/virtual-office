@@ -96,11 +96,9 @@
             <span><i class="dot idle"></i> Idle · 閒置</span>
           </div>
 
-          <div class="time-toggle" role="group" aria-label="Lighting">
-            <button type="button" class="time-btn" data-light="now">Now</button>
-            <button type="button" class="time-btn active" data-light="day">Day</button>
-            <button type="button" class="time-btn" data-light="evening">Evening</button>
-            <button type="button" class="time-btn" data-light="night">Night</button>
+          <div id="light-now" class="time-toggle" role="status" aria-live="polite" aria-label="Now · Asia/Hong_Kong">
+            <span class="time-kicker">Now</span>
+            <span id="hk-clock" class="time-clock">—</span>
           </div>
 
           <button id="simulate-btn" type="button" class="sim-btn">
@@ -109,6 +107,36 @@
           </button>
         </div>
       </div>
+
+      <aside id="portal-panel" class="portal-panel" hidden aria-label="Portal handoff">
+        <div class="portal-head">
+          <div>
+            <div class="portal-kicker">Portal · 指令交接</div>
+            <div id="portal-bot" class="portal-bot">Select a bot</div>
+            <div id="portal-dept" class="portal-dept"></div>
+          </div>
+          <button type="button" id="portal-close" class="portal-close" aria-label="Close portal">✕</button>
+        </div>
+        <form id="portal-form" class="portal-form">
+          <label class="portal-label" for="portal-input">Message / command · 訊息或指令</label>
+          <textarea
+            id="portal-input"
+            rows="3"
+            maxlength="500"
+            placeholder="交給總管的訊息或指令"
+            disabled
+          ></textarea>
+          <div class="portal-actions">
+            <button type="submit" id="portal-send" class="portal-send" disabled>Send · 送出</button>
+            <span id="portal-confirm" class="portal-confirm" hidden>已交總管</span>
+          </div>
+          <p class="portal-note">
+            Queues for 總管 on this browser. Not a Cursor chat.
+            未設定 webhook 時只留在本機佇列。
+          </p>
+        </form>
+        <ul id="portal-queue" class="portal-queue" aria-label="Handoff queue"></ul>
+      </aside>
 
       <aside id="hover-panel" class="hover-panel" hidden>
         <div id="hover-name" class="hover-name"></div>
