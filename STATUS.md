@@ -3,9 +3,8 @@
 Dev: `npm run dev` → open Vite URL under `/virtual-office/`.
 Password gate opens when `VITE_OFFICE_PASSWORD_HASH` is unset.
 
-Scene: cozy six-zone cutaway (Focus / Collaboration / Social / Meeting /
-Phone / Reception) matching floor-plan reference. No ceiling, no exterior
-city backdrop. All 12 bots are seated rilakkuma at Focus desks + Reception
-lead. Dallas-style HUD chrome retained. Lighting: Now / Day / Evening / Night.
+Scene: cozy six-zone cutaway (no ceiling, no exterior city). Role homes:
+Reception (lead) · Focus×6 · Collaboration×3 · Phone×2. Meeting = handoff
+walk target; Social = brief idle visits. Seated rilakkuma + Dallas-style HUD.
 
 Capture `screenshots/cozy-plan-*.png` (overview, focus, social, mobile).
