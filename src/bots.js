@@ -2,13 +2,11 @@ import * as THREE from 'three';
 import { TEAM, LEAD_ID } from './team.js';
 import { getEffectiveStatus } from './supabase.js';
 
-const TAG_SCALE = 0.01;
-
-function mat(color) {
+function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({
     color,
-    roughness: 0.92,
-    metalness: 0.0,
+    roughness: opts.roughness ?? 0.88,
+    metalness: opts.metalness ?? 0.02,
   });
 }
 
@@ -18,22 +16,23 @@ function makeTagTexture(shortName) {
   c.width = 256;
   c.height = 64;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = 'rgba(245, 247, 249, 0.92)';
+  ctx.fillStyle = 'rgba(247, 246, 243, 0.94)';
   ctx.fillRect(0, 0, 256, 64);
-  ctx.strokeStyle = 'rgba(120, 130, 140, 0.55)';
+  ctx.strokeStyle = 'rgba(120, 130, 140, 0.45)';
   ctx.strokeRect(1, 1, 254, 62);
   ctx.fillStyle = '#3a4550';
-  ctx.font = '500 22px "Segoe UI", "Noto Sans TC", sans-serif';
+  ctx.font = '500 20px "Noto Sans TC", "Segoe UI", sans-serif';
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   const label = shortName.length > 18 ? shortName.slice(0, 17) + '…' : shortName;
-  ctx.fillText(label, 128, 40);
+  ctx.fillText(label, 128, 34);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
 /**
- * Blocky matte person in flat profile colour — no shimmer.
+ * Slightly refined matte person — still readable colour blocks, less toy.
  */
 function createPersonMesh(member) {
   const g = new THREE.Group();
@@ -41,32 +40,39 @@ function createPersonMesh(member) {
   g.userData.member = member;
 
   const color = parseInt(member.color.slice(1), 16);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.55, 0.22), mat(color));
-  body.position.y = 0.95;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.52, 0.2), mat(color, { roughness: 0.9 }));
+  body.position.y = 0.94;
   body.castShadow = true;
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.28), mat(color));
-  head.position.y = 1.4;
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.26, 0.26, 0.26),
+    mat(color, { roughness: 0.85 }),
+  );
+  head.position.y = 1.36;
   head.castShadow = true;
 
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.14), mat(0x37474f));
-  legL.position.set(-0.1, 0.35, 0);
-  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.14), mat(0x37474f));
-  legR.position.set(0.1, 0.35, 0);
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.42, 0.13), mat(0x2f3b42));
+  legL.position.set(-0.09, 0.34, 0);
+  legL.castShadow = true;
+  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.42, 0.13), mat(0x2f3b42));
+  legR.position.set(0.09, 0.34, 0);
+  legR.castShadow = true;
 
-  // Small accessory cue (block)
-  const acc = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.1), mat(0xb0bec5));
-  acc.position.set(0.22, 1.0, 0.05);
+  const acc = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.07, 0.09),
+    mat(0xb0bec5, { roughness: 0.55, metalness: 0.15 }),
+  );
+  acc.position.set(0.2, 0.98, 0.04);
+  acc.castShadow = true;
 
   g.add(body, head, legL, legR, acc);
 
-  // Name tag pinned above head — no bobbing
   const tagTex = makeTagTexture(member.name);
   const tag = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.1, 0.28),
+    new THREE.PlaneGeometry(1.05, 0.26),
     new THREE.MeshBasicMaterial({ map: tagTex, transparent: true, depthWrite: false }),
   );
-  tag.position.y = 1.75;
+  tag.position.y = 1.7;
   tag.userData.isTag = true;
   g.add(tag);
 
@@ -103,7 +109,6 @@ export function createBotManager(scene, desks, leadDoor) {
 
   function seatedPose(desk) {
     if (!desk) return { x: 0, y: 0, z: 0, rot: 0 };
-    // Sit slightly in front of desk facing it
     const facing = desk.rot;
     const ox = Math.sin(facing) * 0.55;
     const oz = Math.cos(facing) * 0.55;
@@ -168,7 +173,6 @@ export function createBotManager(scene, desks, leadDoor) {
   }
 
   function ease(t) {
-    // Measured formal ease-in-out
     return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   }
 
@@ -182,7 +186,6 @@ export function createBotManager(scene, desks, leadDoor) {
         const e = ease(m.t);
         mesh.position.x = m.from.x + (m.to.x - m.from.x) * e;
         mesh.position.z = m.from.z + (m.to.z - m.from.z) * e;
-        // No bobbing — y stays 0 (or seated offset baked in pose)
         mesh.position.y = 0;
 
         let rotDiff = m.to.rot - m.from.rot;
@@ -190,7 +193,6 @@ export function createBotManager(scene, desks, leadDoor) {
         while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
         mesh.rotation.y = m.from.rot + rotDiff * e;
 
-        // Subtle measured stride (legs only, no body bob)
         const stride = Math.sin(m.t * Math.PI * 4) * 0.04 * (1 - Math.abs(m.t - 0.5) * 2);
         if (mesh.userData.parts) {
           mesh.userData.parts.legL.rotation.x = stride;
@@ -202,7 +204,6 @@ export function createBotManager(scene, desks, leadDoor) {
             mesh.userData.parts.legL.rotation.x = 0;
             mesh.userData.parts.legR.rotation.x = 0;
           }
-          // After handoff arrival, hold then return
           if (m.phase === 'to-lead') {
             const desk = desks.get(id);
             setTimeout(() => {
@@ -218,7 +219,6 @@ export function createBotManager(scene, desks, leadDoor) {
         }
       }
 
-      // Tags face camera, pinned (no bob)
       const tag = mesh.userData.parts?.tag;
       if (tag && camera) {
         tag.quaternion.copy(camera.quaternion);

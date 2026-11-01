@@ -1,27 +1,31 @@
 import * as THREE from 'three';
 import { TEAM, LEAD_ID } from './team.js';
 
-/** Palette — formal HKSAR departmental, neutral */
+/** Palette — warmer formal HKSAR departmental, less toy-like */
 const C = {
-  floor: 0xc5ccd4,
-  carpet: 0xb0bac4,
-  wall: 0xe8ecf0,
-  glass: 0xa8c4d8,
-  frame: 0x6a7684,
-  desk: 0x8d6e63,
-  deskTop: 0xd7ccc8,
-  plant: 0x2e7d32,
-  pot: 0x795548,
-  sky: 0x9eb8d0,
-  harbour: 0x5a7a92,
-  building: 0x7a8896,
-  screen: 0x1a2332,
-  rack: 0x37474f,
+  floor: 0xb8c0c4,
+  carpet: 0x9aa7b0,
+  carpetLead: 0x8b97a3,
+  wall: 0xeee8e0,
+  wallTrim: 0xd4cdc4,
+  glass: 0xb7d0e0,
+  frame: 0x5c6770,
+  desk: 0x7a5c4e,
+  deskTop: 0xd9cfc4,
+  plant: 0x3d6b45,
+  plantDark: 0x2f5536,
+  pot: 0x6d4c41,
+  sky: 0xb8cce0,
+  harbour: 0x4a6d82,
+  building: 0x6e7c8a,
+  buildingLite: 0x8a96a2,
+  screen: 0x15202b,
+  rack: 0x2f3b42,
   ledOn: 0x66bb6a,
   ledOff: 0x1b5e20,
-  labelBg: 0xf5f7f9,
-  teaCounter: 0xa1887f,
-  meetingTable: 0x6d4c41,
+  labelBg: 0xf7f6f3,
+  teaCounter: 0x958278,
+  meetingTable: 0x5d4037,
 };
 
 /**
@@ -29,7 +33,6 @@ const C = {
  */
 export function deskLayout() {
   const desks = new Map();
-  // Lead corner office (+X, +Z)
   desks.set(LEAD_ID, { x: 10.5, z: 10.2, rot: Math.PI, zone: 'lead' });
 
   const openPlan = [
@@ -56,12 +59,13 @@ export const LEAD_OFFICE_DOOR = { x: 8.2, z: 8.5 };
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({
     color,
-    roughness: opts.roughness ?? 0.85,
-    metalness: opts.metalness ?? 0.05,
+    roughness: opts.roughness ?? 0.82,
+    metalness: opts.metalness ?? 0.04,
     transparent: opts.transparent ?? false,
     opacity: opts.opacity ?? 1,
     emissive: opts.emissive ?? 0x000000,
     emissiveIntensity: opts.emissiveIntensity ?? 0,
+    depthWrite: opts.depthWrite ?? true,
   });
 }
 
@@ -73,59 +77,71 @@ function box(w, h, d, color, opts) {
 }
 
 function cyl(rTop, rBot, h, color, opts) {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, 12), mat(color, opts));
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, 16), mat(color, opts));
   m.castShadow = true;
   m.receiveShadow = true;
   return m;
 }
 
-/** Canvas texture for bilingual EN-above-ZH labels */
+/** Refined bilingual EN-above-ZH wall plaque */
 function makeLabelTexture(en, zh, w = 512, h = 128) {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#f5f7f9';
+
+  // Soft warm plaque
+  ctx.fillStyle = '#f7f6f3';
   ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = '#9aa5b0';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(2, 2, w - 4, h - 4);
-  ctx.fillStyle = '#1a2332';
-  ctx.font = '600 36px "Segoe UI", "Noto Sans TC", sans-serif';
+  ctx.fillStyle = '#ebe7e0';
+  ctx.fillRect(0, h - 8, w, 8);
+
+  ctx.strokeStyle = '#a8b0b8';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(4, 4, w - 8, h - 8);
+  ctx.strokeStyle = '#d4cdc4';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(10, 10, w - 20, h - 20);
+
+  ctx.fillStyle = '#1c2430';
+  ctx.font = '600 34px "Noto Sans TC", "Segoe UI", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(en, w / 2, 52);
-  ctx.fillStyle = '#5a6570';
-  ctx.font = '400 28px "Noto Sans TC", "Segoe UI", sans-serif';
-  ctx.fillText(zh, w / 2, 96);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(en, w / 2, 48);
+  ctx.fillStyle = '#5c6773';
+  ctx.font = '500 26px "Noto Sans TC", "Segoe UI", sans-serif';
+  ctx.fillText(zh, w / 2, 88);
+
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
   return tex;
 }
 
 function wallLabel(en, zh, width = 2.4) {
   const g = new THREE.Group();
-  const plate = box(width, 0.45, 0.04, C.labelBg, { roughness: 0.7 });
+  const plate = box(width, 0.42, 0.035, C.labelBg, { roughness: 0.65 });
   const tex = makeLabelTexture(en, zh);
   const face = new THREE.Mesh(
-    new THREE.PlaneGeometry(width * 0.92, 0.36),
+    new THREE.PlaneGeometry(width * 0.92, 0.34),
     new THREE.MeshBasicMaterial({ map: tex }),
   );
-  face.position.z = 0.025;
+  face.position.z = 0.022;
   g.add(plate, face);
   return g;
 }
 
 function plant(scale = 1) {
   const g = new THREE.Group();
-  const potM = cyl(0.18 * scale, 0.22 * scale, 0.28 * scale, C.pot);
-  potM.position.y = 0.14 * scale;
-  const foliage = cyl(0.05 * scale, 0.35 * scale, 0.55 * scale, C.plant, { roughness: 0.95 });
-  foliage.position.y = 0.5 * scale;
+  const potM = cyl(0.16 * scale, 0.2 * scale, 0.26 * scale, C.pot, { roughness: 0.9 });
+  potM.position.y = 0.13 * scale;
+  const foliage = cyl(0.04 * scale, 0.32 * scale, 0.5 * scale, C.plant, { roughness: 0.95 });
+  foliage.position.y = 0.48 * scale;
   const top = new THREE.Mesh(
-    new THREE.SphereGeometry(0.28 * scale, 10, 8),
-    mat(C.plant, { roughness: 0.95 }),
+    new THREE.SphereGeometry(0.26 * scale, 12, 10),
+    mat(C.plantDark, { roughness: 0.95 }),
   );
-  top.position.y = 0.75 * scale;
+  top.position.y = 0.72 * scale;
   top.castShadow = true;
   g.add(potM, foliage, top);
   return g;
@@ -133,33 +149,44 @@ function plant(scale = 1) {
 
 function deskUnit(colorAccent = C.desk) {
   const g = new THREE.Group();
-  const top = box(1.6, 0.06, 0.8, C.deskTop);
+  const top = box(1.6, 0.05, 0.8, C.deskTop, { roughness: 0.55 });
   top.position.y = 0.72;
-  const body = box(1.5, 0.55, 0.7, colorAccent);
+  const body = box(1.5, 0.55, 0.7, colorAccent, { roughness: 0.75 });
   body.position.y = 0.4;
-  const mon = box(0.55, 0.35, 0.04, C.screen, { roughness: 0.4, metalness: 0.2 });
+  const mon = box(0.55, 0.34, 0.035, C.screen, { roughness: 0.35, metalness: 0.25 });
   mon.position.set(0, 1.0, -0.2);
-  const stand = box(0.08, 0.2, 0.08, 0x455a64);
+  const bezel = box(0.58, 0.37, 0.02, 0x37474f, { roughness: 0.5, metalness: 0.2 });
+  bezel.position.set(0, 1.0, -0.22);
+  const stand = box(0.08, 0.2, 0.08, 0x455a64, { roughness: 0.45, metalness: 0.3 });
   stand.position.set(0, 0.82, -0.2);
-  const chair = box(0.45, 0.08, 0.45, 0x546e7a);
+  const chair = box(0.45, 0.07, 0.45, 0x4a5a66, { roughness: 0.7 });
   chair.position.set(0, 0.42, 0.65);
-  const back = box(0.45, 0.45, 0.06, 0x455a64);
-  back.position.set(0, 0.65, 0.85);
-  g.add(top, body, mon, stand, chair, back);
+  const back = box(0.45, 0.42, 0.05, 0x3e4e58, { roughness: 0.7 });
+  back.position.set(0, 0.64, 0.85);
+  g.add(top, body, bezel, mon, stand, chair, back);
   return g;
 }
 
-function glassPartition(w, h, d = 0.06) {
+function glassPartition(w, h, d = 0.045) {
   const g = new THREE.Group();
-  const glass = box(w, h, d, C.glass, { transparent: true, opacity: 0.35, roughness: 0.2, metalness: 0.1 });
+  const glass = box(w, h, d, C.glass, {
+    transparent: true,
+    opacity: 0.22,
+    roughness: 0.08,
+    metalness: 0.15,
+    depthWrite: false,
+  });
   glass.position.y = h / 2;
-  const frameL = box(0.06, h, d + 0.02, C.frame);
+  glass.castShadow = false;
+  const frameL = box(0.05, h, d + 0.02, C.frame, { roughness: 0.45, metalness: 0.35 });
   frameL.position.set(-w / 2, h / 2, 0);
-  const frameR = box(0.06, h, d + 0.02, C.frame);
+  const frameR = box(0.05, h, d + 0.02, C.frame, { roughness: 0.45, metalness: 0.35 });
   frameR.position.set(w / 2, h / 2, 0);
-  const frameT = box(w + 0.06, 0.06, d + 0.02, C.frame);
+  const frameT = box(w + 0.05, 0.05, d + 0.02, C.frame, { roughness: 0.45, metalness: 0.35 });
   frameT.position.set(0, h, 0);
-  g.add(glass, frameL, frameR, frameT);
+  const sill = box(w + 0.05, 0.04, d + 0.04, C.wallTrim, { roughness: 0.6 });
+  sill.position.set(0, 0.02, 0);
+  g.add(glass, frameL, frameR, frameT, sill);
   return g;
 }
 
@@ -168,61 +195,93 @@ function glassPartition(w, h, d = 0.06) {
  */
 export function buildOffice() {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xd4dde6);
-  scene.fog = new THREE.Fog(0xd4dde6, 28, 55);
+  scene.background = new THREE.Color(0xd6e0e6);
+  scene.fog = new THREE.Fog(0xd6e0e6, 32, 62);
 
-  // Lights — neutral, restrained
-  const hemi = new THREE.HemisphereLight(0xe8eef4, 0x8a9199, 0.55);
+  // Warmer, softer lighting
+  const hemi = new THREE.HemisphereLight(0xfff4ea, 0x8a949c, 0.62);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff8f0, 0.75);
-  sun.position.set(12, 22, 8);
+
+  const sun = new THREE.DirectionalLight(0xfff1e0, 0.88);
+  sun.position.set(14, 20, 10);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -20;
-  sun.shadow.camera.right = 20;
-  sun.shadow.camera.top = 20;
-  sun.shadow.camera.bottom = -20;
+  sun.shadow.camera.left = -22;
+  sun.shadow.camera.right = 22;
+  sun.shadow.camera.top = 22;
+  sun.shadow.camera.bottom = -22;
+  sun.shadow.bias = -0.00025;
+  sun.shadow.normalBias = 0.03;
+  sun.shadow.radius = 3.5;
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(0xc5d0dc, 0.25);
-  fill.position.set(-10, 10, -8);
+
+  const fill = new THREE.DirectionalLight(0xc9d6e4, 0.28);
+  fill.position.set(-12, 12, -10);
   scene.add(fill);
 
-  // Floor slab
-  const floor = box(28, 0.12, 24, C.floor);
+  const rim = new THREE.DirectionalLight(0xffe8d2, 0.18);
+  rim.position.set(4, 6, -14);
+  scene.add(rim);
+
+  // Floor slab — cooler stone with warm undertone
+  const floor = box(28, 0.12, 24, C.floor, { roughness: 0.92 });
   floor.position.set(0, -0.06, 0);
+  floor.castShadow = false;
   scene.add(floor);
 
+  // Subtle floor grid lines (thin strips)
+  for (let i = -6; i <= 6; i++) {
+    if (i === 0) continue;
+    const line = box(28, 0.005, 0.02, 0xaab4bc, { roughness: 1 });
+    line.position.set(0, 0.005, i * 1.8);
+    line.castShadow = false;
+    scene.add(line);
+  }
+
   // Carpet zones
-  const openCarpet = box(18, 0.02, 12, C.carpet);
+  const openCarpet = box(18, 0.018, 12, C.carpet, { roughness: 0.98 });
   openCarpet.position.set(-1, 0.01, 1);
+  openCarpet.castShadow = false;
   scene.add(openCarpet);
 
-  // Outer walls (low)
+  // Outer walls — warm off-white with baseboard
   const wallH = 3.2;
-  const north = box(28, wallH, 0.2, C.wall);
+  const north = box(28, wallH, 0.18, C.wall, { roughness: 0.88 });
   north.position.set(0, wallH / 2, -12);
-  const south = box(28, wallH, 0.2, C.wall);
+  const south = box(28, wallH, 0.18, C.wall, { roughness: 0.88 });
   south.position.set(0, wallH / 2, 12);
-  const west = box(0.2, wallH, 24, C.wall);
+  const west = box(0.18, wallH, 24, C.wall, { roughness: 0.88 });
   west.position.set(-14, wallH / 2, 0);
-  const east = box(0.2, wallH, 24, C.wall);
+  const east = box(0.18, wallH, 24, C.wall, { roughness: 0.88 });
   east.position.set(14, wallH / 2, 0);
   scene.add(north, south, west, east);
 
-  // Ceiling strip lights (simple)
+  const baseN = box(28, 0.12, 0.22, C.wallTrim, { roughness: 0.7 });
+  baseN.position.set(0, 0.06, -11.95);
+  const baseS = box(28, 0.12, 0.22, C.wallTrim, { roughness: 0.7 });
+  baseS.position.set(0, 0.06, 11.95);
+  scene.add(baseN, baseS);
+
+  // Soft ceiling strip lights
   for (let i = -3; i <= 3; i++) {
-    const lightBar = box(3.5, 0.05, 0.25, 0xf5f5f0, {
-      emissive: 0xf5f5f0,
-      emissiveIntensity: 0.35,
-      roughness: 0.5,
+    const lightBar = box(3.4, 0.04, 0.22, 0xfff8ee, {
+      emissive: 0xfff0d8,
+      emissiveIntensity: 0.45,
+      roughness: 0.4,
     });
-    lightBar.position.set(i * 3.5 - 1, wallH - 0.1, 0);
+    lightBar.position.set(i * 3.5 - 1, wallH - 0.08, 0);
+    lightBar.castShadow = false;
     scene.add(lightBar);
+
+    const pt = new THREE.PointLight(0xfff2e0, 0.12, 10, 2);
+    pt.position.set(i * 3.5 - 1, wallH - 0.35, 0);
+    scene.add(pt);
   }
 
   // —— Lead glass corner office (+X +Z) ——
-  const leadFloor = box(6.5, 0.025, 5.5, 0xa8b4c0);
+  const leadFloor = box(6.5, 0.022, 5.5, C.carpetLead, { roughness: 0.98 });
   leadFloor.position.set(10.5, 0.02, 9.5);
+  leadFloor.castShadow = false;
   scene.add(leadFloor);
 
   const leadGlassW = glassPartition(5.5, 2.6);
@@ -238,28 +297,28 @@ export function buildOffice() {
   leadLabel.rotation.y = Math.PI / 2;
   scene.add(leadLabel);
 
-  // Harbour / skyline view (simple geometry beyond east windows)
+  // Harbour / skyline view
   const skyPlane = new THREE.Mesh(
     new THREE.PlaneGeometry(14, 5),
     mat(C.sky, { roughness: 1 }),
   );
   skyPlane.position.set(15.5, 2.2, 6);
   skyPlane.rotation.y = -Math.PI / 2;
+  skyPlane.receiveShadow = false;
   scene.add(skyPlane);
 
-  const harbour = box(0.3, 0.4, 12, C.harbour);
-  harbour.position.set(15.2, 0.3, 5);
+  const harbour = box(0.3, 0.35, 12, C.harbour, { roughness: 0.55, metalness: 0.1 });
+  harbour.position.set(15.2, 0.28, 5);
   scene.add(harbour);
 
   for (let i = 0; i < 6; i++) {
     const bh = 1.2 + (i % 3) * 0.7;
-    const b = box(0.8, bh, 1.1, C.building);
+    const b = box(0.8, bh, 1.1, i % 2 ? C.building : C.buildingLite, { roughness: 0.85 });
     b.position.set(16.2 + (i % 2) * 0.9, bh / 2, 2 + i * 1.6);
     scene.add(b);
   }
 
-  // Lead desk
-  const leadDesk = deskUnit(0x6d4c41);
+  const leadDesk = deskUnit(0x5d4037);
   leadDesk.position.set(10.5, 0, 10.2);
   leadDesk.rotation.y = Math.PI;
   scene.add(leadDesk);
@@ -277,46 +336,49 @@ export function buildOffice() {
   meetLabel.position.set(-10, 2.4, -4.9);
   scene.add(meetLabel);
 
-  const table = box(3.2, 0.08, 1.4, C.meetingTable);
+  const table = box(3.2, 0.07, 1.4, C.meetingTable, { roughness: 0.55 });
   table.position.set(-10.5, 0.75, -8.5);
   scene.add(table);
-  const tableLeg = box(2.8, 0.7, 1.0, 0x5d4037);
-  tableLeg.position.set(-10.5, 0.35, -8.5);
+  const tableLeg = box(2.8, 0.68, 1.0, 0x4e342e, { roughness: 0.7 });
+  tableLeg.position.set(-10.5, 0.34, -8.5);
   scene.add(tableLeg);
 
   for (let i = 0; i < 6; i++) {
     const side = i < 3 ? -1 : 1;
     const idx = i % 3;
-    const ch = box(0.4, 0.08, 0.4, 0x607d8b);
+    const ch = box(0.4, 0.07, 0.4, 0x546e7a, { roughness: 0.7 });
     ch.position.set(-11.5 + idx * 1.0, 0.42, -8.5 + side * 1.1);
-    const bk = box(0.4, 0.4, 0.05, 0x546e7a);
+    const bk = box(0.4, 0.38, 0.05, 0x455a64, { roughness: 0.7 });
     bk.position.set(-11.5 + idx * 1.0, 0.62, -8.5 + side * 1.3);
     scene.add(ch, bk);
   }
 
-  // —— Tea room / pantry (HK gov style) ——
+  // —— Tea room / pantry ——
   const teaLabel = wallLabel('Tea Room / Pantry', '茶水間', 2.4);
   teaLabel.position.set(10, 2.4, -10.5);
   teaLabel.rotation.y = -0.2;
   scene.add(teaLabel);
 
-  const counter = box(3.5, 0.9, 0.7, C.teaCounter);
-  counter.position.set(11, 0.45, -10);
+  const counter = box(3.5, 0.88, 0.7, C.teaCounter, { roughness: 0.72 });
+  counter.position.set(11, 0.44, -10);
   scene.add(counter);
-  const sink = box(0.5, 0.08, 0.4, 0xb0bec5);
-  sink.position.set(10.2, 0.92, -10);
+  const counterTop = box(3.55, 0.04, 0.74, 0xcfd6da, { roughness: 0.4, metalness: 0.15 });
+  counterTop.position.set(11, 0.9, -10);
+  scene.add(counterTop);
+  const sink = box(0.5, 0.06, 0.4, 0xb0bec5, { roughness: 0.35, metalness: 0.25 });
+  sink.position.set(10.2, 0.94, -10);
   scene.add(sink);
-  const kettle = cyl(0.12, 0.14, 0.28, 0x90a4ae);
+  const kettle = cyl(0.12, 0.14, 0.26, 0x90a4ae, { roughness: 0.35, metalness: 0.4 });
   kettle.position.set(11.2, 1.1, -10);
   scene.add(kettle);
-  const cups = box(0.35, 0.2, 0.25, 0xeceff1);
+  const cups = box(0.35, 0.18, 0.25, 0xeceff1, { roughness: 0.6 });
   cups.position.set(11.8, 1.0, -10);
   scene.add(cups);
-  const fridge = box(0.7, 1.6, 0.65, 0xcfd8dc);
-  fridge.position.set(13, 0.8, -10);
+  const fridge = box(0.7, 1.55, 0.65, 0xcfd8dc, { roughness: 0.35, metalness: 0.2 });
+  fridge.position.set(13, 0.78, -10);
   scene.add(fridge);
 
-  // —— Research area with animated screens ——
+  // —— Research area ——
   const researchLabel = wallLabel('Research Area', '研究區', 2.2);
   researchLabel.position.set(-3, 2.4, -10.8);
   scene.add(researchLabel);
@@ -324,8 +386,8 @@ export function buildOffice() {
   const animatables = { screens: [], racks: [] };
 
   for (let i = 0; i < 3; i++) {
-    const stand = box(1.2, 1.4, 0.08, 0x37474f);
-    stand.position.set(-5 + i * 2.2, 0.9, -11.2);
+    const stand = box(1.2, 1.35, 0.07, 0x37474f, { roughness: 0.55, metalness: 0.2 });
+    stand.position.set(-5 + i * 2.2, 0.88, -11.2);
     scene.add(stand);
     const canvas = document.createElement('canvas');
     canvas.width = 256;
@@ -338,33 +400,37 @@ export function buildOffice() {
     );
     screen.position.set(-5 + i * 2.2, 1.15, -11.15);
     scene.add(screen);
-    animatables.screens.push({ canvas, tex, kind: i }); // 0 chart, 1 map, 2 terminal
+    animatables.screens.push({ canvas, tex, kind: i });
   }
 
-  // —— Technical zone: server racks ——
+  // —— Technical zone ——
   const techLabel = wallLabel('Technical Zone', '技術區', 2.2);
   techLabel.position.set(6.5, 2.4, -5);
   techLabel.rotation.y = -Math.PI / 2;
   scene.add(techLabel);
 
   for (let i = 0; i < 4; i++) {
-    const rack = box(0.7, 2.0, 0.5, C.rack, { roughness: 0.6, metalness: 0.25 });
+    const rack = box(0.7, 2.0, 0.5, C.rack, { roughness: 0.55, metalness: 0.3 });
     rack.position.set(8 + (i % 2) * 1.0, 1.0, -2 - Math.floor(i / 2) * 1.2);
     scene.add(rack);
     const leds = [];
     for (let r = 0; r < 8; r++) {
-      const led = box(0.08, 0.06, 0.02, C.ledOff, {
+      const led = box(0.08, 0.05, 0.02, C.ledOff, {
         emissive: C.ledOff,
-        emissiveIntensity: 0.4,
+        emissiveIntensity: 0.35,
       });
-      led.position.set(8 + (i % 2) * 1.0 + 0.2, 0.3 + r * 0.2, -2 - Math.floor(i / 2) * 1.2 + 0.26);
+      led.position.set(
+        8 + (i % 2) * 1.0 + 0.2,
+        0.3 + r * 0.2,
+        -2 - Math.floor(i / 2) * 1.2 + 0.26,
+      );
+      led.castShadow = false;
       scene.add(led);
       leds.push(led);
     }
     animatables.racks.push(leds);
   }
 
-  // Glass partitions for open floor zoning
   const midGlass = glassPartition(10, 2.4);
   midGlass.position.set(-1, 0, 1);
   scene.add(midGlass);
@@ -373,7 +439,6 @@ export function buildOffice() {
   openLabel.position.set(-1, 2.55, 1.1);
   scene.add(openLabel);
 
-  // Desks for team (except lead already placed)
   const desks = deskLayout();
   for (const member of TEAM) {
     if (member.isLead) continue;
@@ -385,7 +450,6 @@ export function buildOffice() {
     scene.add(unit);
   }
 
-  // Plants — plenty
   const plantSpots = [
     [-12, 10], [-12, 5], [-12, -3], [-12, -10],
     [12, 5], [5, 11], [-6, 11], [0, -6],
@@ -393,12 +457,11 @@ export function buildOffice() {
     [-3, 7], [10, -7], [-10, 2], [2, 8],
   ];
   for (const [px, pz] of plantSpots) {
-    const p = plant(0.85 + Math.random() * 0.3);
+    const p = plant(0.85 + ((px * 13 + pz * 7) % 10) * 0.03);
     p.position.set(px, 0, pz);
     scene.add(p);
   }
 
-  // Carpet bilingual floor markers (small)
   const carpetMark = wallLabel('AS Virtual Office', '虛擬辦公室', 2.0);
   carpetMark.rotation.x = -Math.PI / 2;
   carpetMark.position.set(0, 0.03, 8);
@@ -413,11 +476,10 @@ export function updateOfficeAnims(animatables, t) {
     const ctx = s.canvas.getContext('2d');
     const w = s.canvas.width;
     const h = s.canvas.height;
-    ctx.fillStyle = '#0d1520';
+    ctx.fillStyle = '#0c141c';
     ctx.fillRect(0, 0, w, h);
 
     if (s.kind === 0) {
-      // Simple bar chart
       ctx.fillStyle = '#90a4ae';
       ctx.font = '12px monospace';
       ctx.fillText('Weekly Metrics · 週指標', 12, 18);
@@ -428,7 +490,6 @@ export function updateOfficeAnims(animatables, t) {
         ctx.fillRect(24 + i * 36, h - 16 - bh, 24, bh);
       });
     } else if (s.kind === 1) {
-      // HK map silhouette (abstract polygon)
       ctx.fillStyle = '#78909c';
       ctx.font = '12px monospace';
       ctx.fillText('Hong Kong · 香港', 12, 18);
@@ -445,13 +506,11 @@ export function updateOfficeAnims(animatables, t) {
       ctx.fill();
       ctx.strokeStyle = '#90caf9';
       ctx.stroke();
-      // Islands dots
       ctx.fillStyle = '#81c784';
       ctx.beginPath();
       ctx.arc(100 + Math.sin(t) * 2, 100, 4, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      // AI text terminal
       ctx.fillStyle = '#66bb6a';
       ctx.font = '11px monospace';
       const lines = [
@@ -459,7 +518,7 @@ export function updateOfficeAnims(animatables, t) {
         '> agents: 12 registered',
         '> locale: zh-Hant / en',
         `> tick: ${Math.floor(t) % 1000}`,
-        '> queue: formal handoff',
+        '> tone: formal handoff',
         '> —',
       ];
       lines.forEach((line, i) => {
@@ -476,7 +535,7 @@ export function updateOfficeAnims(animatables, t) {
       const col = on ? C.ledOn : C.ledOff;
       led.material.color.setHex(col);
       led.material.emissive.setHex(col);
-      led.material.emissiveIntensity = on ? 0.8 : 0.15;
+      led.material.emissiveIntensity = on ? 0.75 : 0.12;
     });
   }
 }

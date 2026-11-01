@@ -2,14 +2,22 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="AS bot team virtual office — HKSAR departmental layout" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="AS Virtual Office — HKSAR departmental bot team presence" />
+    <meta name="theme-color" content="#1a237e" />
     <title>Virtual Office · 虛擬辦公室 | AS Virtual Office</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <div id="auth-gate" class="auth-gate" aria-live="polite">
       <div class="auth-card">
+        <p class="auth-brand-en">AS Virtual Office</p>
         <h1>Virtual Office</h1>
         <p class="auth-sub">虛擬辦公室 · Restricted Access</p>
         <label for="office-password" class="auth-label">
@@ -21,6 +29,7 @@
           type="password"
           autocomplete="current-password"
           placeholder="Enter password"
+          enterkeyhint="go"
         />
         <button id="auth-submit" type="button">Enter · 進入</button>
         <p id="auth-error" class="auth-error" hidden>Incorrect password · 密碼不正確</p>
@@ -43,7 +52,31 @@
         </div>
       </header>
 
-      <canvas id="office-canvas"></canvas>
+      <div class="stage">
+        <canvas id="office-canvas"></canvas>
+
+        <aside id="status-board" class="status-board" aria-label="Bot status board">
+          <div class="status-board-head">
+            <button
+              type="button"
+              id="status-board-toggle"
+              class="status-board-toggle"
+              aria-expanded="true"
+              aria-controls="status-list"
+            >
+              <span class="toggle-en">Status Board</span>
+              <span class="toggle-zh">狀態板</span>
+              <span class="toggle-chevron" aria-hidden="true">▾</span>
+            </button>
+            <div id="status-summary" class="status-summary">
+              <span class="sum-working">0 working</span>
+              <span class="sum-handoff">0 handoff</span>
+              <span class="sum-idle">12 idle</span>
+            </div>
+          </div>
+          <ul id="status-list" class="status-list" role="list"></ul>
+        </aside>
+      </div>
 
       <aside id="hover-panel" class="hover-panel" hidden>
         <div id="hover-name" class="hover-name"></div>
