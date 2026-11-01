@@ -49,10 +49,12 @@
           </div>
           <div id="hud-counters" class="hud-counters" aria-live="polite">
             <span class="hud-chip"><i class="dot working"></i><b id="hud-working">0</b> working</span>
+            <span class="hud-chip"><i class="dot huddle"></i><b id="hud-huddle">0</b> huddle</span>
             <span class="hud-chip"><i class="dot handoff"></i><b id="hud-handoff">0</b> handoff</span>
             <span class="hud-chip"><i class="dot idle"></i><b id="hud-idle">12</b> idle</span>
             <span class="hud-chip"><i class="dot free"></i><b id="hud-free">12</b> free desks</span>
           </div>
+          <div id="feed-conn" class="feed-conn" data-state="connecting" role="status">Feed · connecting</div>
           <div id="feed-warning" class="feed-warning" hidden>
             Status feed quiet &gt; 45 min · 狀態饋送靜默超過 45 分鐘
           </div>
@@ -89,6 +91,7 @@
         <div class="hud-bottom">
           <div class="status-legend" aria-label="Status legend">
             <span><i class="dot working"></i> Working · 工作中</span>
+            <span><i class="dot huddle"></i> Huddle · 會議</span>
             <span><i class="dot handoff"></i> Handoff · 交接</span>
             <span><i class="dot idle"></i> Idle · 閒置</span>
           </div>

@@ -4,7 +4,7 @@
 
 Stack: **Vite + Three.js** true cutaway / dollhouse (no ceiling, no exterior city
 backdrop). Zones follow sidebar sections: **Reception / 總管 · Programming / 编程 ·
-General · ITSS1 · Self Enhancement** (Meeting = handoff walk; Social lounge amenity).
+General · ITSS1 · Self Enhancement** (Meeting = huddle seats that stay, plus a short handoff visit; Social lounge amenity).
 Tech / sci-fi materials: cool LED accents, glass, holographic panels, dark tech floor
 mixed with warm wood desks; procedural foliage (not blob plants). Bots are **seated
 rilakkuma-style plush** at their section homes. Dark HUD: counters, team sidebar +
@@ -36,7 +36,20 @@ If `VITE_OFFICE_PASSWORD_HASH` is empty, the gate opens for local builds.
 ### Simulate Work
 
 Bottom button **Simulate Work / 模擬工作** runs browser-only motion. It never writes to Supabase.
-`?simulate=1` auto-starts simulation.
+`?simulate=1` auto-starts simulation. `?cam=meeting` frames the conference table.
+
+Simulate parks a stable group of up to four bots in one huddle (`sim-huddle`) so they walk to meeting chairs and stay. Rows are marked `[SIM]` and the state chip reads **Huddle SIM**. Bots that already have a live `huddle` row are not overridden, and that live room keeps its chairs.
+
+### Huddle heartbeat
+
+`scripts/push-status.mjs` upserts with the service role (never the anon key, never a `VITE_` secret).
+
+```bash
+node scripts/push-status.mjs <bot_id> huddle "Design review" \
+  --room-id design-review --room-label "Design review"
+```
+
+Same `--room-id` on two or more bots seats them together (sorted `bot_id` → chair). While a bot is `huddle` or `working`, re-run the upsert about every 3 minutes so `updated_at` stays fresh. Working, handoff, waiting, error, and done drop to idle after 10 minutes without a heartbeat. Huddle stays for 45 minutes so a missed beat does not clear the meeting.
 
 ### GitHub Pages
 

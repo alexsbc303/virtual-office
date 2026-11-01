@@ -48,7 +48,7 @@ export function seatFromDesk(deskX, deskZ, zone = 'itss1', chair = CHAIR) {
 /**
  * Section zones (world XZ). Windows on −Z; entrance on +Z.
  * Primary homes match AS sidebar categories.
- * Meeting kept as handoff amenity (no permanent homes).
+ * Meeting is a huddle room (seats stay) plus a short handoff visit. No permanent homes.
  */
 export const ZONES = [
   {
@@ -122,7 +122,7 @@ export const ZONES = [
 /**
  * Desk / seat anchors by sidebar section.
  * Reception 1 · Programming 1 · General 4 · ITSS1 5 · Self Enhancement 1.
- * Meeting = handoff walk only; Social lounge sits inside Self Enhancement.
+ * Meeting = huddle seats + short handoff visit. Social lounge sits inside Self Enhancement.
  */
 export function deskLayout() {
   const desks = new Map();
@@ -175,8 +175,95 @@ export function deskLayout() {
   return desks;
 }
 
-/** Meeting 會議 — handoff / walk target at conference table */
-export const MEETING_HANDOFF = { x: -5.6, y: CHAIR.seatY, z: 3.6 };
+/** Conference table center inside Meeting 會議 (buildMeetingRoom). */
+export const MEETING_TABLE = { x: -5.6, z: 3.4 };
+
+/**
+ * Eight chairs built around the meeting table, same order as the meshes.
+ * Offsets are relative to MEETING_TABLE. yaw faces the table:
+ * 0 = +Z, Math.PI = −Z, π/2 = +X, −π/2 = −X.
+ */
+export const MEETING_CHAIR_OFFSETS = [
+  { x: -0.9, z: -0.95, yaw: 0 },
+  { x: 0, z: -0.95, yaw: 0 },
+  { x: 0.9, z: -0.95, yaw: 0 },
+  { x: -0.9, z: 0.95, yaw: Math.PI },
+  { x: 0, z: 0.95, yaw: Math.PI },
+  { x: 0.9, z: 0.95, yaw: Math.PI },
+  { x: -1.55, z: 0, yaw: Math.PI / 2 },
+  { x: 1.55, z: 0, yaw: -Math.PI / 2 },
+];
+
+/** World poses for those eight chairs. Huddle bots sit here and stay. */
+export const MEETING_SEATS = MEETING_CHAIR_OFFSETS.map((o) => ({
+  x: MEETING_TABLE.x + o.x,
+  y: CHAIR.seatY,
+  z: MEETING_TABLE.z + o.z,
+  yaw: o.yaw,
+}));
+
+/**
+ * Stable seats for bots in a huddle.
+ * Roommates (same roomId) are sorted by id and indexed into MEETING_SEATS.
+ * Live rooms are placed before simulated rooms so a SIM huddle does not take
+ * a chair a real huddle already occupies. A single room uses sort order only.
+ *
+ * @param {{ id: string, roomId?: string|null, simulated?: boolean }[]} entries
+ * @returns {Map<string, { index: number, x: number, y: number, z: number, yaw: number }>}
+ */
+export function assignHuddleSeats(entries) {
+  /** @type {Map<string, { live: boolean, ids: string[] }>} */
+  const groups = new Map();
+  for (const entry of entries) {
+    const key = typeof entry.roomId === 'string' ? entry.roomId.trim() : '';
+    let group = groups.get(key);
+    if (!group) {
+      group = { live: false, ids: [] };
+      groups.set(key, group);
+    }
+    group.ids.push(entry.id);
+    if (!entry.simulated) group.live = true;
+  }
+
+  const keys = [...groups.keys()].sort((a, b) => {
+    const liveA = groups.get(a).live ? 0 : 1;
+    const liveB = groups.get(b).live ? 0 : 1;
+    if (liveA !== liveB) return liveA - liveB;
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
+
+  const taken = new Set();
+  /** @type {Map<string, { index: number, x: number, y: number, z: number, yaw: number }>} */
+  const assigned = new Map();
+  for (const key of keys) {
+    const ids = [...new Set(groups.get(key).ids)].sort();
+    ids.forEach((id, order) => {
+      let index = order % MEETING_SEATS.length;
+      if (taken.has(index)) {
+        for (let step = 1; step < MEETING_SEATS.length; step++) {
+          const candidate = (order + step) % MEETING_SEATS.length;
+          if (!taken.has(candidate)) {
+            index = candidate;
+            break;
+          }
+        }
+      }
+      taken.add(index);
+      const seat = MEETING_SEATS[index];
+      assigned.set(id, { index, x: seat.x, y: seat.y, z: seat.z, yaw: seat.yaw });
+    });
+  }
+  return assigned;
+}
+
+/**
+ * Meeting 會議 — short handoff visit stands near the table (auto-returns).
+ * Huddle uses MEETING_SEATS and stays. z is the table, slightly south of center
+ * so the temporary visit does not sit inside a chair mesh.
+ */
+export const MEETING_HANDOFF = { x: MEETING_TABLE.x, y: CHAIR.seatY, z: 3.6 };
 /** @deprecated alias — handoffs go to Meeting now */
 export const LEAD_HANDOFF = MEETING_HANDOFF;
 
@@ -649,8 +736,8 @@ function buildSocialLounge(root, wood, woodWarm, sofaMat, loungeAccent, plant, p
 }
 
 function buildMeetingRoom(root, wood, woodWarm, woodDark, glassMat, frost, blackMetal, screenGlow, plant, pot) {
-  const cx = -5.6;
-  const cz = 3.4;
+  const cx = MEETING_TABLE.x;
+  const cz = MEETING_TABLE.z;
   const gw = 5.0;
   const gd = 4.6;
   const gh = 2.55;
@@ -692,28 +779,12 @@ function buildMeetingRoom(root, wood, woodWarm, woodDark, glassMat, frost, black
     box(0.08, 0.72, 0.08, woodWarm, cx + lx, 0.36, cz + lz, root);
   }
   const seat = mat(0x1a222c, { roughness: 0.55, metalness: 0.25 });
-  const chairSpots = [
-    [-0.9, -0.95],
-    [0, -0.95],
-    [0.9, -0.95],
-    [-0.9, 0.95],
-    [0, 0.95],
-    [0.9, 0.95],
-    [-1.55, 0],
-    [1.55, 0],
-  ];
-  for (const [ox, oz] of chairSpots) {
+  for (const spot of MEETING_CHAIR_OFFSETS) {
+    const ox = spot.x;
+    const oz = spot.z;
     box(0.42, 0.07, 0.42, seat, cx + ox, 0.42, cz + oz, root);
-    box(
-      0.42,
-      0.4,
-      0.06,
-      seat,
-      cx + ox,
-      0.65,
-      cz + oz + (oz === 0 ? (ox > 0 ? 0.18 : -0.18) : Math.sign(oz) * 0.18),
-      root,
-    );
+    const back = oz === 0 ? (ox > 0 ? 0.18 : -0.18) : Math.sign(oz) * 0.18;
+    box(0.42, 0.4, 0.06, seat, cx + ox, 0.65, cz + oz + back, root);
   }
 
   box(0.06, 1.1, 1.8, blackMetal, cx - gw / 2 + 0.12, 1.55, cz, root);
