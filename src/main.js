@@ -362,24 +362,23 @@ async function boot() {
   const basePos = camera.position.clone();
 
   const cam = params.get('cam');
-  if (cam === 'closeup' || cam === 'focus') {
-    camera.position.set(-1.5, 5.5, 2.5);
-    controls.target.set(-4.5, 0.6, -3.5);
-    basePos.copy(camera.position);
-    controls.update();
-  } else if (cam === 'social') {
-    camera.position.set(11.5, 6.5, 2.0);
-    controls.target.set(5.5, 0.5, -3.5);
-    basePos.copy(camera.position);
-    controls.update();
-  } else if (cam === 'lead' || cam === 'reception') {
-    camera.position.set(8.5, 5.5, 10.5);
-    controls.target.set(3.5, 0.6, 3.5);
-    basePos.copy(camera.position);
-    controls.update();
-  } else if (cam === 'lead') {
-    camera.position.set(7.2, 4.2, 2.4);
-    controls.target.set(3.2, 0.8, -2.2);
+  const camPresets = {
+    closeup: { pos: [-1.5, 5.5, 2.5], target: [-4.5, 0.6, -3.5] },
+    focus: { pos: [-1.5, 5.5, 2.5], target: [-4.5, 0.6, -3.5] },
+    itss1: { pos: [-2.5, 7.2, 1.8], target: [-5.0, 0.5, -3.5] },
+    programming: { pos: [4.5, 6.5, 2.0], target: [1.15, 0.5, -3.8] },
+    general: { pos: [3.5, 7.0, 11.0], target: [-0.3, 0.5, 3.5] },
+    self: { pos: [11.5, 6.5, 2.0], target: [5.5, 0.5, -3.5] },
+    social: { pos: [11.5, 6.5, 2.0], target: [5.5, 0.5, -3.5] },
+    plants: { pos: [10.5, 5.8, -1.5], target: [6.5, 0.7, -4.0] },
+    lead: { pos: [8.5, 5.5, 10.5], target: [4.0, 0.6, 3.5] },
+    reception: { pos: [8.5, 5.5, 10.5], target: [4.0, 0.6, 3.5] },
+    overview: { pos: [12.5, 11.5, 13.5], target: [0.2, 0.3, 0.2] },
+  };
+  if (cam && camPresets[cam]) {
+    const p = camPresets[cam];
+    camera.position.set(...p.pos);
+    controls.target.set(...p.target);
     basePos.copy(camera.position);
     controls.update();
   }

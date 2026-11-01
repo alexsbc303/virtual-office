@@ -1,13 +1,15 @@
 # AS Virtual Office
 
-Cozy **3D isometric virtual office** for the AS bot team (Dallas-style HUD chrome).
+**3D isometric virtual office** for the AS bot team (Dallas-style HUD chrome).
 
 Stack: **Vite + Three.js** true cutaway / dollhouse (no ceiling, no exterior city
-backdrop). Six floor-plan zones: Focus · Collaboration · Social · Meeting · Phone ·
-Reception with warm wood, soft rugs, and biophilic plants. Bots are **seated
-rilakkuma-style plush** at Focus desks (+ Reception lead). Dark HUD: counters,
-team sidebar + activity feed, status legend, Day/Evening/Night lighting.
-Live presence via **Supabase Realtime** (`bot_status`, `usage_snapshot`).
+backdrop). Zones follow sidebar sections: **Reception / 總管 · Programming / 编程 ·
+General · ITSS1 · Self Enhancement** (Meeting = handoff walk; Social lounge amenity).
+Tech / sci-fi materials: cool LED accents, glass, holographic panels, dark tech floor
+mixed with warm wood desks; procedural foliage (not blob plants). Bots are **seated
+rilakkuma-style plush** at their section homes. Dark HUD: counters, team sidebar +
+activity feed, status legend, Day/Evening/Night lighting. Live presence via
+**Supabase Realtime** (`bot_status`, `usage_snapshot`).
 
 ## Quick start
 
@@ -47,9 +49,8 @@ npm run build
 
 ## Style
 
-3D room framed like the anime reference: bright open-plan, floor-to-ceiling
-windows with city backdrop, warm wood desks, glass directorate room, kitchenette,
-hanging plants, industrial pipes and track lights. Soft warm window light +
-ACES tone mapping. Figures are original procedural seated plush meshes (soft materials,
-chibi proportions) with team colours on scarves, badge rings, and desk tags.
-Each bot sits on their office chair facing a computer.
+Tech cutaway framed like a sci-fi ops floor: dark metal + glass partitions, cyan/magenta
+LED rails, holographic wall panels, warm wood desks, open roof with pendant LEDs.
+Soft cool void behind windows (no city mural). Figures are original procedural seated
+plush meshes with team colours on scarves, badge rings, and desk tags. Each bot sits
+on their office chair facing a computer in their sidebar section zone.
