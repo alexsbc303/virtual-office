@@ -4,7 +4,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { runPasswordGate } from './auth.js';
 import {
   buildOfficeScene,
   setupLighting,
@@ -254,8 +253,6 @@ function createStatusBoard(activity, hooks = {}) {
 }
 
 async function boot() {
-  await runPasswordGate();
-
   const canvas = document.getElementById('office-canvas');
   const hoverPanel = document.getElementById('hover-panel');
   const hoverName = document.getElementById('hover-name');
@@ -490,9 +487,9 @@ async function boot() {
     self: { pos: [11.5, 6.5, 2.0], target: [5.5, 0.5, -3.5] },
     social: { pos: [11.5, 6.5, 2.0], target: [5.5, 0.5, -3.5] },
     plants: { pos: [10.5, 5.8, -1.5], target: [6.5, 0.7, -4.0] },
-    // From inside the floor, looking at 總管's face (they face −Z).
-    lead: { pos: [0.4, 9.2, -2.4], target: [4.0, 0.7, 5.0] },
-    reception: { pos: [0.4, 9.2, -2.4], target: [4.0, 0.7, 5.0] },
+    // From the office floor, looking at 總管's face across the guest lip.
+    lead: { pos: [3.5, 6.4, 0.2], target: [4.05, 0.9, 4.7] },
+    reception: { pos: [4.2, 11.4, 0.15], target: [4.15, 0.35, 4.2] },
     overview: { pos: [12.5, 11.5, 13.5], target: [0.2, 0.3, 0.2] },
     meeting: { pos: [-5.7, 11.4, 8.4], target: [-5.6, 0.2, 3.3] },
   };

@@ -20,14 +20,15 @@ export const CHAIR = {
 };
 
 /**
- * Reception desk anchor. The counter sits between 總管 and the floor.
- * Chair is on the entrance side (+Z); the figure faces −Z into the office.
+ * Reception counter anchor. The guest lip is the −Z face (office floor
+ * and the other bots). The return runs +Z on the east side, so the staff
+ * pocket opens toward visitors instead of the entrance wall.
  */
-export const RECEPTION_DESK = { x: 4.0, z: 4.35 };
+export const RECEPTION_DESK = { x: 4.15, z: 3.85 };
 
-/** 總管 faces the other desks (−Z), not the entrance. */
+/** 總管 sits in the pocket behind the counter and faces −Z into the office. */
 export const RECEPTION_CHAIR = {
-  offsetZ: 0.78,
+  offsetZ: 0.88,
   seatY: 0.45,
   faceYaw: Math.PI,
 };
@@ -601,7 +602,8 @@ function buildOpenPendants(root) {
     [5.5, -3.5, 0xb388ff],
     [-5.5, 3.2, 0x7c4dff],
     [-0.3, 3.5, 0x40c4ff],
-    [4.6, 3.4, 0xff80ab],
+    // Over the guest approach, not on the counter (the shade read as a disk on the wood).
+    [3.45, 2.15, 0xff80ab],
   ];
   for (const [x, z, col] of spots) {
     const glow = new THREE.Mesh(
@@ -615,6 +617,8 @@ function buildOpenPendants(root) {
     );
     glow.position.set(x, ROOM.h - 0.55, z);
     root.add(glow);
+    // Reception shade + square sat in perspective on the counter (dark disk).
+    if (col === 0xff80ab) continue;
     const shade = new THREE.Mesh(
       new THREE.CylinderGeometry(0.16, 0.2, 0.05, 16),
       mat(0x1a2230, { roughness: 0.4, metalness: 0.6 }),
@@ -812,23 +816,28 @@ function buildPhoneBooths(root, wood, woodWarm, blackMetal, partitionMat, screen
 }
 
 function buildReception(root, wood, woodWarm, blackMetal, sofaMat, plant, plantDark, pot, potWarm, screenGlow) {
-  // L-shaped counter. 總管 sits on the entrance side and looks −Z across the desk.
+  // L counter: long guest lip faces −Z (office / visitors). The return
+  // continues +Z along the east side so the inner corner is the staff
+  // pocket, not the entrance wall. 總管 sits in that pocket facing −Z.
   const dx = RECEPTION_DESK.x;
   const dz = RECEPTION_DESK.z;
+  const chairX = dx - 0.15;
   const chairZ = dz + RECEPTION_CHAIR.offsetZ;
-  box(3.2, 0.95, 0.7, wood, dx, 0.48, dz, root);
-  box(3.2, 0.05, 0.75, woodWarm, dx, 0.98, dz, root);
-  ledStrip(root, 3.05, 0.025, dx, 1.01, dz - 0.34, 0xff80ab, 0.75);
-  box(0.7, 0.95, 1.9, wood, dx + 1.35, 0.48, dz - 1.05, root);
-  box(0.75, 0.05, 1.9, woodWarm, dx + 1.35, 0.98, dz - 1.05, root);
+  box(3.3, 0.95, 0.68, wood, dx, 0.48, dz, root);
+  box(3.3, 0.05, 0.74, woodWarm, dx, 0.98, dz, root);
+  ledStrip(root, 3.15, 0.028, dx, 1.01, dz - 0.32, 0xff80ab, 0.75);
+  const rx = dx + 1.32;
+  const rz = dz + 0.95;
+  box(0.68, 0.95, 1.7, wood, rx, 0.48, rz, root);
+  box(0.74, 0.05, 1.72, woodWarm, rx, 0.98, rz, root);
 
-  box(0.5, 0.34, 0.03, blackMetal, dx - 0.15, 1.25, dz + 0.2, root);
-  box(0.46, 0.28, 0.012, screenGlow, dx - 0.15, 1.25, dz + 0.22, root, false);
+  box(0.5, 0.34, 0.03, blackMetal, dx - 0.15, 1.22, dz + 0.08, root);
+  box(0.46, 0.28, 0.012, screenGlow, dx - 0.15, 1.22, dz + 0.1, root, false);
 
   const seat = mat(0x1a222c, { roughness: 0.55, metalness: 0.25 });
-  box(0.5, 0.08, 0.5, seat, dx, 0.435, chairZ, root);
-  box(0.5, 0.52, 0.07, seat, dx, 0.72, chairZ + 0.2, root);
-  cyl(0.055, 0.055, 0.34, blackMetal, dx, 0.22, chairZ, root, 10, false);
+  box(0.5, 0.08, 0.5, seat, chairX, 0.435, chairZ, root);
+  box(0.5, 0.52, 0.07, seat, chairX, 0.72, chairZ + 0.22, root);
+  cyl(0.055, 0.055, 0.34, blackMetal, chairX, 0.22, chairZ, root, 10, false);
 
   // LED green-wall / planter
   box(0.45, 2.2, 3.0, mat(0x1a2430, { metalness: 0.45, roughness: 0.45 }), 6.5, 1.1, 3.5, root);
@@ -1117,7 +1126,7 @@ export function setupLighting(scene) {
     [5.5, -3.5, 0.55, 0xb388ff],
     [-5.5, 3.2, 0.5, 0x7c4dff],
     [-0.3, 3.5, 0.55, 0x40c4ff],
-    [4.6, 3.4, 0.55, 0xff80ab],
+    [3.45, 2.15, 0.55, 0xff80ab],
   ]) {
     const p = new THREE.PointLight(col, i, 11, 2);
     p.position.set(x, 2.9, z);

@@ -123,19 +123,41 @@ begin
   end if;
 end $$;
 
--- Portal handoffs. Same statement as sql/portal_handoffs.sql.
--- The office UI does not insert. Anon is select-only. Service role writes.
+-- Portal handoffs. Same statements as sql/portal_handoffs.sql.
+-- Write path: Edge Function portal-handoff inserts with the service role.
+-- The page calls that function with the anon key. Anon stays select-only.
+-- Never put SUPABASE_SERVICE_ROLE_KEY in a VITE_ variable.
 create table if not exists public.portal_handoffs (
   id uuid primary key,
   bot_id uuid not null,
   lead_id uuid,
   message text not null check (char_length(message) between 1 and 500),
   source text not null default 'virtual-office',
+  payload jsonb,
   created_at timestamptz not null default now()
 );
 
+alter table public.portal_handoffs add column if not exists payload jsonb;
+alter table public.portal_handoffs alter column lead_id set not null;
+
+alter table public.portal_handoffs drop constraint if exists portal_handoffs_source_check;
+alter table public.portal_handoffs
+  add constraint portal_handoffs_source_check
+  check (source = 'virtual-office');
+
+alter table public.portal_handoffs drop constraint if exists portal_handoffs_payload_object;
+alter table public.portal_handoffs
+  add constraint portal_handoffs_payload_object
+  check (payload is null or jsonb_typeof(payload) = 'object');
+
 comment on table public.portal_handoffs is
-  'Operator-written portal handoffs from the office queue. Anon may select only.';
+  'Handoffs for Hub/總管. Written by edge function portal-handoff (service role). Anon may select only.';
+
+comment on column public.portal_handoffs.payload is
+  'Full portal_handoff JSON. Same shape as the optional webhook body.';
+
+create index if not exists portal_handoffs_created_at_idx
+  on public.portal_handoffs (created_at);
 
 alter table public.portal_handoffs enable row level security;
 
@@ -150,6 +172,7 @@ drop policy if exists portal_handoffs_update_anon on public.portal_handoffs;
 drop policy if exists portal_handoffs_delete_anon on public.portal_handoffs;
 
 revoke insert, update, delete, truncate on table public.portal_handoffs from anon, authenticated;
+grant select on table public.portal_handoffs to anon;
 
 do $$
 begin

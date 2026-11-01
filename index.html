@@ -16,28 +16,7 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div id="auth-gate" class="auth-gate" aria-live="polite">
-      <div class="auth-card">
-        <p class="auth-brand-en">AS Virtual Office</p>
-        <h1>Virtual Office</h1>
-        <p class="auth-sub">虛擬辦公室 · Restricted Access</p>
-        <label for="office-password" class="auth-label">
-          Access Password
-          <span class="zh">通行密碼</span>
-        </label>
-        <input
-          id="office-password"
-          type="password"
-          autocomplete="current-password"
-          placeholder="Enter password"
-          enterkeyhint="go"
-        />
-        <button id="auth-submit" type="button">Enter · 進入</button>
-        <p id="auth-error" class="auth-error" hidden>Incorrect password · 密碼不正確</p>
-      </div>
-    </div>
-
-    <div id="app" class="app" hidden>
+    <div id="app" class="app">
       <div class="stage">
         <canvas id="office-canvas"></canvas>
 
@@ -128,11 +107,11 @@
           ></textarea>
           <div class="portal-actions">
             <button type="submit" id="portal-send" class="portal-send" disabled>Send · 送出</button>
-            <span id="portal-confirm" class="portal-confirm" hidden>已交總管</span>
+            <span id="portal-confirm" class="portal-confirm" hidden>已交總管佇列</span>
           </div>
           <p class="portal-note">
-            Queues for 總管 on this browser. Not a Cursor chat.
-            未設定 webhook 時只留在本機佇列。
+            Send writes the 總管 queue. This browser keeps a copy if that write fails. Not a Cursor chat.
+            送出寫入總管佇列；寫入失敗時只留本機備份。不是 Cursor 聊天。
           </p>
         </form>
         <ul id="portal-queue" class="portal-queue" aria-label="Handoff queue"></ul>
