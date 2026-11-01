@@ -1,6 +1,6 @@
 # AS Virtual Office
 
-Formal HKSAR-style departmental 3D virtual office for the AS bot team.
+3D virtual office for the AS bot team.
 
 Stack: **Vite + Three.js** static front-end. Live presence via **Supabase Realtime** (`bot_status`, `usage_snapshot`).
 
