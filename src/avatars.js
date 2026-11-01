@@ -1,8 +1,8 @@
 /**
- * Procedural anime-adjacent avatar sprites (Canvas).
- * Semi-realistic anime proportions (not chibi/toy): larger detailed eyes,
- * styled hair in team colour, casual-pro outfits with team accents.
+ * Name-tag canvases + optional 2D badge helpers.
+ * Scene avatars are procedural 3D figures (see figures.js).
  */
+
 
 const SKINS = ['#f3d0b5', '#e8c4a4', '#f0d5c4', '#e0b898', '#d4a888', '#f5d8c0'];
 const HAIR_STYLES = ['bob', 'short', 'side', 'ponytail', 'messy', 'long'];

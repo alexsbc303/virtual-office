@@ -252,6 +252,7 @@ async function boot() {
     refreshAll();
   }
 
+
   function showHover(member, clientX, clientY) {
     if (!member) {
       hoverPanel.hidden = true;
@@ -296,6 +297,26 @@ async function boot() {
   let userDriving = false;
   let swayT = 0;
   const basePos = camera.position.clone();
+
+  // Deterministic camera presets for screenshots / deep links
+  const cam = new URLSearchParams(window.location.search).get('cam');
+  if (cam === 'closeup') {
+    camera.position.set(1.2, 1.55, 4.2);
+    controls.target.set(-3.4, 0.85, 1.2);
+    basePos.copy(camera.position);
+    controls.update();
+  } else if (cam === 'lead') {
+    camera.position.set(6.0, 2.0, -0.2);
+    controls.target.set(3.2, 0.85, -2.6);
+    basePos.copy(camera.position);
+    controls.update();
+  } else if (cam === 'zones') {
+    camera.position.set(6.5, 3.8, 8.5);
+    controls.target.set(2.5, 1.2, -2.5);
+    basePos.copy(camera.position);
+    controls.update();
+  }
+
   controls.addEventListener('start', () => {
     userDriving = true;
   });

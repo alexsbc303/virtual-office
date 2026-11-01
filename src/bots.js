@@ -1,10 +1,11 @@
 /**
- * 3D anime billboard avatars: placement, status motion, ray pick.
+ * 3D plush/chibi figures: placement, status motion, ray pick.
  */
 import * as THREE from 'three';
 import { TEAM, LEAD_ID } from './team.js';
 import { getEffectiveStatus } from './supabase.js';
-import { createAvatarSprite, createNameTagCanvas } from './avatars.js';
+import { createNameTagCanvas } from './avatars.js';
+import { createFigure } from './figures.js';
 import { LEAD_HANDOFF } from './office.js';
 
 /**
@@ -22,38 +23,43 @@ export function createBotManager(scene, desks, camera) {
   /** @type {Map<string, object>} */
   const motion = new Map();
 
-  const ringGeo = new THREE.RingGeometry(0.28, 0.38, 32);
+  const ringGeo = new THREE.RingGeometry(0.32, 0.42, 32);
   ringGeo.rotateX(-Math.PI / 2);
 
-  TEAM.forEach((member, index) => {
-    const spriteCanvas = createAvatarSprite(member, index, 256);
-    const tex = new THREE.CanvasTexture(spriteCanvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.needsUpdate = true;
+  /** Meshes used for ray picking */
+  const pickables = [];
 
-    const mat = new THREE.SpriteMaterial({
-      map: tex,
-      transparent: true,
-      depthWrite: false,
-    });
-    const sprite = new THREE.Sprite(mat);
-    const scale = member.isLead ? 1.75 : 1.6;
-    sprite.scale.set(scale, scale, 1);
+  TEAM.forEach((member, index) => {
+    const { root: figure, figureType, height } = createFigure(member, index);
 
     const desk = desks.get(member.id);
     const x = desk?.x ?? 0;
     const z = desk?.z ?? 0;
-    sprite.position.set(x, scale * 0.5, z);
+    figure.position.set(x, 0, z);
+    // Face roughly toward camera / entrance (+Z)
+    figure.rotation.y = 0;
 
-    // Status ring under feet
+    // Status ring under feet (team colour tint + state colour)
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x78909c,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.7,
       side: THREE.DoubleSide,
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.position.set(x, 0.03, z);
+
+    // Soft team-colour accent ring (inner)
+    const accentGeo = new THREE.RingGeometry(0.24, 0.3, 32);
+    accentGeo.rotateX(-Math.PI / 2);
+    const accentMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(member.color),
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.DoubleSide,
+    });
+    const accentRing = new THREE.Mesh(accentGeo, accentMat);
+    accentRing.position.set(x, 0.025, z);
 
     // Name tag billboard
     const tagCanvas = createNameTagCanvas(member);
@@ -62,22 +68,30 @@ export function createBotManager(scene, desks, camera) {
     const tagMat = new THREE.SpriteMaterial({ map: tagTex, transparent: true, depthWrite: false });
     const tag = new THREE.Sprite(tagMat);
     tag.scale.set(1.25, 0.3, 1);
-    tag.position.set(x, scale + 0.15, z);
+    tag.position.set(x, height + 0.22, z);
 
+    group.add(accentRing);
     group.add(ring);
-    group.add(sprite);
+    group.add(figure);
     group.add(tag);
+
+    figure.traverse((obj) => {
+      if (obj.isMesh) pickables.push(obj);
+    });
 
     bots.set(member.id, {
       member,
-      sprite,
+      figure,
+      figureType,
       ring,
+      accentRing,
       tag,
       tagTex,
-      scale,
+      height,
       x,
       y: 0,
       z,
+      facing: 0,
       bob: index * 0.7,
       label: shortLabel(member.name),
     });
@@ -159,17 +173,34 @@ export function createBotManager(scene, desks, camera) {
     return 0x78909c;
   }
 
+  function lerpAngle(a, b, t) {
+    let diff = b - a;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    return a + diff * t;
+  }
+
   function update(dt) {
     for (const [id, b] of bots) {
       const m = motion.get(id);
       if (!m) continue;
       b.bob += dt;
 
+      let moving = false;
       if (m.t < 1) {
+        moving = true;
         m.t = Math.min(1, m.t + dt / m.duration);
         const e = ease(m.t);
         b.x = m.from.x + (m.to.x - m.from.x) * e;
         b.z = m.from.z + (m.to.z - m.from.z) * e;
+
+        // Face travel direction while moving
+        const dx = m.to.x - m.from.x;
+        const dz = m.to.z - m.from.z;
+        if (dx * dx + dz * dz > 1e-6) {
+          const desired = Math.atan2(dx, dz);
+          b.facing = lerpAngle(b.facing, desired, Math.min(1, dt * 4));
+        }
 
         if (m.t >= 1) {
           if (m.phase === 'to-lead' && id !== LEAD_ID) {
@@ -188,17 +219,44 @@ export function createBotManager(scene, desks, camera) {
       }
 
       const st = getEffectiveStatus(id);
-      const bounce =
-        st.state === 'working'
-          ? Math.sin(b.bob * 4) * 0.03
-          : st.state === 'handoff'
-            ? Math.sin(b.bob * 6) * 0.05
-            : Math.sin(b.bob * 1.5) * 0.01;
 
-      b.sprite.position.set(b.x, b.scale * 0.5 + bounce, b.z);
+      // Idle bounce / work bob / handoff hop
+      let bounce =
+        st.state === 'working'
+          ? Math.sin(b.bob * 4) * 0.035
+          : st.state === 'handoff'
+            ? Math.sin(b.bob * 6) * 0.055
+            : Math.sin(b.bob * 1.5) * 0.012;
+
+      // Work bob: lean / nod the figure slightly
+      let leanX = 0;
+      if (st.state === 'working' && !moving) {
+        leanX = Math.sin(b.bob * 3.2) * 0.06;
+        bounce += Math.abs(Math.sin(b.bob * 3.2)) * 0.01;
+      }
+
+      // When in handoff and arrived near lead, turn toward lead
+      if (st.state === 'handoff' && !moving && id !== LEAD_ID) {
+        const dx = LEAD_HANDOFF.x - b.x;
+        const dz = (LEAD_HANDOFF.z - 0.4) - b.z;
+        const desired = Math.atan2(dx, dz);
+        b.facing = lerpAngle(b.facing, desired, Math.min(1, dt * 3));
+      } else if (st.state === 'idle' && !moving) {
+        // Ease back to face entrance (+Z)
+        b.facing = lerpAngle(b.facing, 0, Math.min(1, dt * 1.5));
+      } else if (st.state === 'working' && !moving) {
+        // Face desk (toward −Z slightly)
+        b.facing = lerpAngle(b.facing, 0, Math.min(1, dt * 2));
+      }
+
+      b.figure.position.set(b.x, bounce, b.z);
+      b.figure.rotation.y = b.facing;
+      b.figure.rotation.x = leanX;
+
       b.ring.position.set(b.x, 0.03, b.z);
       b.ring.material.color.setHex(ringColor(st.state));
-      b.tag.position.set(b.x, b.scale + 0.18 + bounce, b.z);
+      b.accentRing.position.set(b.x, 0.025, b.z);
+      b.tag.position.set(b.x, b.height + 0.22 + bounce, b.z);
     }
   }
 
@@ -217,22 +275,41 @@ export function createBotManager(scene, desks, camera) {
     pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
 
-    // Prefer nearest sprite by projected distance
+    const hits = raycaster.intersectObjects(pickables, false);
+    if (hits.length > 0) {
+      let obj = hits[0].object;
+      while (obj && obj.parent) {
+        for (const b of bots.values()) {
+          if (obj === b.figure || b.figure.children.includes(obj)) {
+            return b.member;
+          }
+        }
+        // Walk up to figure root
+        if (obj.parent?.name?.startsWith?.('figure-')) {
+          for (const b of bots.values()) {
+            if (b.figure === obj.parent || b.figure === obj) return b.member;
+          }
+        }
+        obj = obj.parent;
+        for (const b of bots.values()) {
+          if (obj === b.figure) return b.member;
+        }
+      }
+    }
+
+    // Fallback: projected center distance (same as prior sprite pick)
     let best = null;
     let bestDist = Infinity;
     for (const b of bots.values()) {
-      const sp = b.sprite;
-      const dist = raycaster.ray.distanceToPoint(sp.position);
-      // Approximate hit: project sprite center to NDC and compare
-      const projected = sp.position.clone().project(camera);
+      const center = new THREE.Vector3(b.x, b.height * 0.55, b.z);
+      const projected = center.project(camera);
       const dx = projected.x - pointer.x;
       const dy = projected.y - pointer.y;
       const d2 = dx * dx + dy * dy;
-      if (d2 < 0.012 && d2 < bestDist) {
+      if (d2 < 0.014 && d2 < bestDist) {
         bestDist = d2;
         best = b.member;
       }
-      void dist;
     }
     return best;
   }
