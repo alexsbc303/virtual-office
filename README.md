@@ -1,11 +1,12 @@
 # AS Virtual Office
 
-Polished **3D isometric virtual office** for the AS bot team (Dallas-style HUD chrome).
+Cozy **3D isometric virtual office** for the AS bot team (Dallas-style HUD chrome).
 
-Stack: **Vite + Three.js** cutaway office (wood floor, glass meeting room, lounge,
-kitchenette, plants, glowing monitors). Bots are **seated rilakkuma-style plush
-figures** with team-colour scarves/rings. Dark HUD: counters, team sidebar +
-activity feed, status legend, Day/Evening/Night lighting.
+Stack: **Vite + Three.js** true cutaway / dollhouse (no ceiling, no exterior city
+backdrop). Six floor-plan zones: Focus · Collaboration · Social · Meeting · Phone ·
+Reception with warm wood, soft rugs, and biophilic plants. Bots are **seated
+rilakkuma-style plush** at Focus desks (+ Reception lead). Dark HUD: counters,
+team sidebar + activity feed, status legend, Day/Evening/Night lighting.
 Live presence via **Supabase Realtime** (`bot_status`, `usage_snapshot`).
 
 ## Quick start

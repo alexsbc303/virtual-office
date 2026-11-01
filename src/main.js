@@ -233,11 +233,11 @@ async function boot() {
 
   const camera = createCamera(w / h);
   const controls = new OrbitControls(camera, canvas);
-  controls.target.set(-0.5, 0.4, 0.2);
+  controls.target.set(0.2, 0.3, 0.2);
   controls.enableDamping = true;
   controls.dampingFactor = 0.07;
-  controls.minDistance = 10;
-  controls.maxDistance = 24;
+  controls.minDistance = 11;
+  controls.maxDistance = 28;
   controls.maxPolarAngle = Math.PI * 0.42;
   controls.minPolarAngle = Math.PI * 0.18;
   controls.enablePan = false;
@@ -362,9 +362,19 @@ async function boot() {
   const basePos = camera.position.clone();
 
   const cam = params.get('cam');
-  if (cam === 'closeup') {
-    camera.position.set(2.2, 3.2, 6.5);
-    controls.target.set(-3.2, 0.7, 2.8);
+  if (cam === 'closeup' || cam === 'focus') {
+    camera.position.set(-1.5, 5.5, 2.5);
+    controls.target.set(-4.5, 0.6, -3.5);
+    basePos.copy(camera.position);
+    controls.update();
+  } else if (cam === 'social') {
+    camera.position.set(11.5, 6.5, 2.0);
+    controls.target.set(5.5, 0.5, -3.5);
+    basePos.copy(camera.position);
+    controls.update();
+  } else if (cam === 'lead' || cam === 'reception') {
+    camera.position.set(8.5, 5.5, 10.5);
+    controls.target.set(3.5, 0.6, 3.5);
     basePos.copy(camera.position);
     controls.update();
   } else if (cam === 'lead') {
@@ -386,8 +396,8 @@ async function boot() {
   window.addEventListener('vo-set-camera', (ev) => {
     const mode = ev.detail?.mode;
     if (mode === 'overview') {
-      camera.position.set(11.5, 9.2, 11.8);
-      controls.target.set(-0.5, 0.4, 0.2);
+      camera.position.set(12.5, 11.5, 13.5);
+      controls.target.set(0.2, 0.3, 0.2);
       basePos.copy(camera.position);
       controls.update();
     }

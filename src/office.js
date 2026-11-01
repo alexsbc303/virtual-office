@@ -1,76 +1,156 @@
 /**
- * AS Virtual Office — polished Three.js anime-style 3D room.
- * Soft Shinkai-like lighting, wood desks, glass meeting room, pantry,
- * hanging plants, industrial ceiling. Procedural anime city in windows.
+ * AS Virtual Office — cozy six-zone cutaway office (floor-plan layout).
+ * True dollhouse: no ceiling, no exterior city backdrop. Warm wood + biophilic.
  */
 import * as THREE from 'three';
-import { LEAD_ID, TEAM } from './team.js';
-import { createSkylineTexture } from './skyline.js';
+import { LEAD_ID } from './team.js';
+import { createSoftSkyTexture } from './skyline.js';
 
-export const ROOM = { w: 18, d: 12, h: 4.2 };
+export const ROOM = { w: 18, d: 14, h: 3.4 };
 
 /**
- * Chair / desk seating constants — keep in sync with buildDesk().
- * Desk surface at (deskX, deskH, deskZ); monitors face +Z; chair sits on +Z side.
- * Seated figures face −Z (toward keyboard/monitors): faceYaw = Math.PI.
+ * Chair / desk seating — desk surface; monitors face −Z (toward windows);
+ * chair sits on +Z side. Seated figures face −Z: faceYaw = Math.PI.
  */
 export const CHAIR = {
-  /** Chair seat center relative to desk center on Z */
   offsetZ: 0.58,
-  /** Top of seat cushion (figure root Y) */
   seatY: 0.45,
-  /** Yaw so local +Z (face) aims at desk (−Z world) */
   faceYaw: Math.PI,
 };
 
+/** Reception: desk faces entrance (+Z); seated figure faces +Z. */
+export const RECEPTION_CHAIR = {
+  offsetZ: -0.55,
+  seatY: 0.45,
+  faceYaw: 0,
+};
+
 /**
- * Build seat pose from a desk center.
  * @param {number} deskX
  * @param {number} deskZ
  * @param {string} zone
+ * @param {{ offsetZ?: number, seatY?: number, faceYaw?: number }} [chair]
  */
-export function seatFromDesk(deskX, deskZ, zone = 'open') {
+export function seatFromDesk(deskX, deskZ, zone = 'focus', chair = CHAIR) {
   return {
     x: deskX,
     y: 0,
     z: deskZ,
     seatX: deskX,
-    seatY: CHAIR.seatY,
-    seatZ: deskZ + CHAIR.offsetZ,
-    faceYaw: CHAIR.faceYaw,
+    seatY: chair.seatY ?? CHAIR.seatY,
+    seatZ: deskZ + (chair.offsetZ ?? CHAIR.offsetZ),
+    faceYaw: chair.faceYaw ?? CHAIR.faceYaw,
     zone,
   };
 }
 
 /**
- * Desk / seat anchors in world space.
- * +X = pantry side, −X = windows, +Z = camera / entrance, −Z = back wall.
- * Use seatX/seatY/seatZ for figure placement; x/z remain desk centers.
+ * Floor-plan zones (world XZ). Windows on −Z; entrance on +Z.
+ * Focus (NW) · Collaboration (N) · Social (NE)
+ * Meeting (SW) · Phone (S-mid) · Reception (SE)
+ */
+export const ZONES = [
+  {
+    id: 'focus',
+    labelEn: 'Focus',
+    labelZh: '專注區',
+    color: 0x8fbf7a,
+    fill: 0xb8d9a8,
+    x: -5.4,
+    z: -3.6,
+    w: 6.8,
+    d: 5.6,
+  },
+  {
+    id: 'collaboration',
+    labelEn: 'Collaboration',
+    labelZh: '協作區',
+    color: 0x6aa8d8,
+    fill: 0xa8cce8,
+    x: -0.1,
+    z: -3.6,
+    w: 4.0,
+    d: 5.6,
+  },
+  {
+    id: 'social',
+    labelEn: 'Social',
+    labelZh: '休憩區',
+    color: 0xd4a574,
+    fill: 0xe8c9a0,
+    x: 4.8,
+    z: -3.6,
+    w: 5.4,
+    d: 5.6,
+  },
+  {
+    id: 'meeting',
+    labelEn: 'Meeting',
+    labelZh: '會議室',
+    color: 0x9b8bc4,
+    fill: 0xc5b8e0,
+    x: -5.6,
+    z: 3.4,
+    w: 5.6,
+    d: 5.2,
+  },
+  {
+    id: 'phone',
+    labelEn: 'Phone',
+    labelZh: '電話亭',
+    color: 0xd48aa8,
+    fill: 0xe8b8c8,
+    x: -1.4,
+    z: 3.6,
+    w: 2.6,
+    d: 4.4,
+  },
+  {
+    id: 'reception',
+    labelEn: 'Reception',
+    labelZh: '接待處',
+    color: 0xa8a8a0,
+    fill: 0xd8d4cc,
+    x: 3.6,
+    z: 3.5,
+    w: 7.6,
+    d: 5.0,
+  },
+];
+
+/**
+ * Desk / seat anchors — 11 Focus workstations + Lead at Reception.
  */
 export function deskLayout() {
   const desks = new Map();
-  desks.set(LEAD_ID, seatFromDesk(3.2, -2.8, 'lead'));
 
-  const openPlan = [
-    { id: '26fffc1c-3c69-4346-8a68-199db47277fd', x: -5.2, z: 2.4 },
-    { id: '4f070b62-ac92-4824-9953-886cda5433d1', x: -3.4, z: 2.6 },
-    { id: '28c84d63-5b73-4b78-aebc-3a2e02376fc2', x: -1.6, z: 2.5 },
-    { id: '2fb3b7e8-b556-45ea-8b10-1ced7f05c0b4', x: 0.2, z: 2.7 },
-    { id: '9f0fa493-9994-409c-b398-974b67de306e', x: 2.0, z: 2.4 },
-    { id: 'aecd27e2-8d49-4c33-962c-cdfa1860fd26', x: -5.4, z: 0.2 },
-    { id: 'b7c9b07d-4a12-49af-bbdf-7fa19bdc96b2', x: -3.6, z: 0.4 },
-    { id: '5f8f09c0-fe3d-40a5-87c1-2fcc440bb9c3', x: -1.8, z: 0.3 },
-    { id: 'c7f037b0-0082-4290-a543-00f203e4c150', x: 0.0, z: 0.5 },
-    { id: '764c93f4-9330-4daa-9f86-481be3b19e60', x: 1.8, z: 0.2 },
-    { id: '6a0dc819-57c2-4507-ae25-f3b3122c3f46', x: 5.6, z: 1.8 },
+  // Lead — Reception L-desk (faces entrance)
+  desks.set(LEAD_ID, seatFromDesk(2.4, 4.2, 'reception', RECEPTION_CHAIR));
+
+  const focusDesks = [
+    // Row nearer windows (−Z)
+    { id: '26fffc1c-3c69-4346-8a68-199db47277fd', x: -7.4, z: -5.2 },
+    { id: '4f070b62-ac92-4824-9953-886cda5433d1', x: -6.0, z: -5.2 },
+    { id: '28c84d63-5b73-4b78-aebc-3a2e02376fc2', x: -4.6, z: -5.2 },
+    { id: '2fb3b7e8-b556-45ea-8b10-1ced7f05c0b4', x: -3.2, z: -5.2 },
+    { id: '9f0fa493-9994-409c-b398-974b67de306e', x: -1.8, z: -5.2 },
+    // Second row
+    { id: 'aecd27e2-8d49-4c33-962c-cdfa1860fd26', x: -7.4, z: -3.0 },
+    { id: 'b7c9b07d-4a12-49af-bbdf-7fa19bdc96b2', x: -6.0, z: -3.0 },
+    { id: '5f8f09c0-fe3d-40a5-87c1-2fcc440bb9c3', x: -4.6, z: -3.0 },
+    { id: 'c7f037b0-0082-4290-a543-00f203e4c150', x: -3.2, z: -3.0 },
+    { id: '764c93f4-9330-4daa-9f86-481be3b19e60', x: -1.8, z: -3.0 },
+    // Overflow focus seat near collab edge
+    { id: '6a0dc819-57c2-4507-ae25-f3b3122c3f46', x: -7.4, z: -1.0 },
   ];
-  for (const d of openPlan) {
-    desks.set(d.id, seatFromDesk(d.x, d.z, 'open'));
+  for (const d of focusDesks) {
+    desks.set(d.id, seatFromDesk(d.x, d.z, 'focus'));
   }
   return desks;
 }
 
-export const LEAD_HANDOFF = { x: 2.4, y: CHAIR.seatY, z: -1.6 };
+/** Handoff meetup near reception desk front */
+export const LEAD_HANDOFF = { x: 2.4, y: CHAIR.seatY, z: 3.2 };
 
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({
@@ -103,269 +183,386 @@ function cyl(rTop, rBot, h, material, x, y, z, parent, segs = 16, shadow = true)
  * @param {THREE.Scene} scene
  * @param {THREE.TextureLoader} _loader
  */
-export function buildOfficeScene(scene, loader) {
+export function buildOfficeScene(scene, _loader) {
   const root = new THREE.Group();
   root.name = 'office-root';
   scene.add(root);
 
-  // Soft anime matte behind back wall (depth cue / Shinkai atmosphere)
-  const matteTex = loader.load(`${import.meta.env.BASE_URL}office-matte.jpg`);
-  matteTex.colorSpace = THREE.SRGBColorSpace;
-  const matte = new THREE.Mesh(
-    new THREE.PlaneGeometry(28, 14),
-    new THREE.MeshBasicMaterial({ map: matteTex, transparent: true, opacity: 0.55 }),
-  );
-  matte.position.set(-2, 3.2, -14);
-  root.add(matte);
-
-  const wood = mat(0xd8bc96, { roughness: 0.48 });
-  const woodDark = mat(0xa8845e, { roughness: 0.45 });
-  const wall = mat(0xf6f1e9, { roughness: 0.92 });
-  const floorMat = mat(0xcfc6b8, { roughness: 0.78 });
-  const ductMat = mat(0x9aa3ab, { roughness: 0.55, metalness: 0.25 });
-  const metal = mat(0x4a5058, { roughness: 0.32, metalness: 0.7 });
-  const blackMetal = mat(0x1c2128, { roughness: 0.38, metalness: 0.6 });
+  // Warm cozy materials — no cold industrial palette
+  const wood = mat(0xd4a574, { roughness: 0.52 });
+  const woodWarm = mat(0xb8895c, { roughness: 0.48 });
+  const woodDark = mat(0x8b6914, { roughness: 0.48 });
+  const wall = mat(0xfaf6f0, { roughness: 0.94 });
+  const wallAccent = mat(0xf0e6d8, { roughness: 0.92 });
+  const charcoal = mat(0x3a3a3e, { roughness: 0.7 });
+  const blackMetal = mat(0x2a2e34, { roughness: 0.4, metalness: 0.55 });
   const glassMat = new THREE.MeshPhysicalMaterial({
-    color: 0xcfe4f4,
-    roughness: 0.05,
+    color: 0xd8eaf6,
+    roughness: 0.08,
     metalness: 0.0,
-    transmission: 0.85,
-    thickness: 0.2,
+    transmission: 0.82,
+    thickness: 0.18,
     transparent: true,
-    opacity: 0.35,
+    opacity: 0.32,
     side: THREE.DoubleSide,
   });
   const frost = new THREE.MeshPhysicalMaterial({
-    color: 0xeaf2f8,
-    roughness: 0.62,
+    color: 0xf2e8dc,
+    roughness: 0.7,
     metalness: 0,
     transparent: true,
-    opacity: 0.62,
+    opacity: 0.55,
     side: THREE.DoubleSide,
   });
-  const plant = mat(0x3f9452, { roughness: 0.78 });
-  const plantDark = mat(0x2c6e3c, { roughness: 0.82 });
-  const pot = mat(0xc8a878, { roughness: 0.68 });
+  const plant = mat(0x4a9a5c, { roughness: 0.8 });
+  const plantDark = mat(0x2f6e3e, { roughness: 0.84 });
+  const pot = mat(0xd2b48c, { roughness: 0.7 });
   const screenGlow = mat(0x9ad0ef, {
     roughness: 0.25,
-    metalness: 0.15,
+    metalness: 0.12,
     emissive: 0x4a88aa,
-    emissiveIntensity: 0.65,
+    emissiveIntensity: 0.55,
   });
-  const rugMat = mat(0x6a7684, { roughness: 0.96 });
-  const sofaMat = mat(0x74808c, { roughness: 0.86 });
+  const sofaMat = mat(0xc8c2b8, { roughness: 0.9 });
+  const loungeBlue = mat(0x5b7c9e, { roughness: 0.88 });
+  const partitionMat = mat(0x9aa0a8, { roughness: 0.75 });
 
-  // Wood plank floor
+  // Base warm wood floor
   const woodFloorMat = makeWoodFloorMaterial();
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), woodFloorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   root.add(floor);
 
-  // Soft rugs
-  const rug1 = new THREE.Mesh(new THREE.PlaneGeometry(10.2, 4.6), rugMat);
-  rug1.rotation.x = -Math.PI / 2;
-  rug1.position.set(-1.4, 0.012, 1.35);
-  rug1.receiveShadow = true;
-  root.add(rug1);
+  // Zone floor tints (biophilic pastel rugs matching plan)
+  for (const z of ZONES) {
+    const tint = new THREE.Mesh(
+      new THREE.PlaneGeometry(z.w, z.d),
+      new THREE.MeshStandardMaterial({
+        color: z.fill,
+        roughness: 0.95,
+        metalness: 0,
+        transparent: true,
+        opacity: 0.55,
+      }),
+    );
+    tint.rotation.x = -Math.PI / 2;
+    tint.position.set(z.x, 0.008, z.z);
+    tint.receiveShadow = true;
+    root.add(tint);
+  }
 
-  // Walls
-  box(ROOM.w, ROOM.h, 0.22, wall, 0, ROOM.h / 2, -ROOM.d / 2, root);
+  // Soft area rugs (cozy layering)
+  const rugFocus = new THREE.Mesh(
+    new THREE.PlaneGeometry(6.2, 5.0),
+    mat(0xd4e8c8, { roughness: 0.98 }),
+  );
+  rugFocus.rotation.x = -Math.PI / 2;
+  rugFocus.position.set(-5.2, 0.014, -3.5);
+  rugFocus.receiveShadow = true;
+  root.add(rugFocus);
+
+  const rugSocial = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.6, 4.4),
+    mat(0xe8d4b0, { roughness: 0.98 }),
+  );
+  rugSocial.rotation.x = -Math.PI / 2;
+  rugSocial.position.set(5.0, 0.014, -3.4);
+  rugSocial.receiveShadow = true;
+  root.add(rugSocial);
+
+  // Exterior walls (charcoal outer feel on edges) — open top, no ceiling
+  // Back wall (−Z) with windows
+  buildWindowWall(root, wall, charcoal, glassMat);
+  // Front wall fragment (+Z) with entrance gap
+  buildEntranceWall(root, wall, charcoal, glassMat);
+  // Side walls
+  box(0.22, ROOM.h, ROOM.d, wall, -ROOM.w / 2, ROOM.h / 2, 0, root);
   box(0.22, ROOM.h, ROOM.d, wall, ROOM.w / 2, ROOM.h / 2, 0, root);
+  // Soft inner wall wash strips (warm, not industrial)
+  box(ROOM.w - 0.5, 0.12, 0.04, wallAccent, 0, 0.9, -ROOM.d / 2 + 0.14, root, false);
 
-  buildWindowWall(root, wall, glassMat);
-  // Cutaway / dollhouse: no solid ceiling (open roof feel). Light ducts only.
-  buildCeilingGear(root, ductMat, metal, blackMetal);
+  // True cutaway: NO ceiling mesh, NO ducts, NO hanging industrial gear.
+  // Warm free-floating pendant glows only (sparse, read as open-roof lamps).
+  buildOpenPendants(root);
 
-  const deskPositions = [
-    [-5.2, 2.4], [-3.4, 2.6], [-1.6, 2.5], [0.2, 2.7], [2.0, 2.4],
-    [-5.4, 0.2], [-3.6, 0.4], [-1.8, 0.3], [0.0, 0.5], [1.8, 0.2],
+  // ——— Focus Zone: desks with privacy partitions ———
+  const focusPositions = [
+    [-7.4, -5.2],
+    [-6.0, -5.2],
+    [-4.6, -5.2],
+    [-3.2, -5.2],
+    [-1.8, -5.2],
+    [-7.4, -3.0],
+    [-6.0, -3.0],
+    [-4.6, -3.0],
+    [-3.2, -3.0],
+    [-1.8, -3.0],
+    [-7.4, -1.0],
   ];
-  for (const [dx, dz] of deskPositions) {
-    buildDesk(root, dx, dz, wood, woodDark, blackMetal, screenGlow, plant, pot);
-  }
-  buildDesk(root, 5.6, 1.8, wood, woodDark, blackMetal, screenGlow, plant, pot, true);
-
-  buildMeetingRoom(root, wood, woodDark, glassMat, frost, blackMetal);
-  buildPantry(root, wood, woodDark, metal);
-
-  // Lounge
-  box(2.4, 0.42, 0.9, sofaMat, -6.3, 0.32, -1.4, root);
-  box(2.4, 0.38, 0.16, sofaMat, -6.3, 0.68, -1.78, root);
-  box(0.6, 0.08, 0.6, wood, -6.3, 0.32, -0.45, root);
-
-  // Bookshelf
-  box(1.5, 1.9, 0.38, woodDark, 1.1, 0.95, -5.55, root);
-  for (let i = 0; i < 4; i++) {
-    box(1.3, 0.05, 0.3, wood, 1.1, 0.35 + i * 0.42, -5.55, root);
-    // Book blocks
-    for (let b = 0; b < 5; b++) {
-      const col = [0x5c6bc0, 0xc62828, 0x2e7d32, 0x6d4c41, 0x00838f][b];
-      box(0.12, 0.28, 0.22, mat(col), 0.55 + b * 0.22, 0.52 + i * 0.42, -5.55, root, false);
-    }
+  for (const [dx, dz] of focusPositions) {
+    buildFocusDesk(root, dx, dz, wood, woodWarm, blackMetal, screenGlow, plant, pot, partitionMat);
   }
 
-  const hangSpots = [
-    [-4.2, -1.1], [-2.1, 1.6], [0.6, -0.4], [2.8, 2.1], [-5.6, 2.9], [4.6, 0.2], [-0.8, 3.1], [5.2, -3.5],
+  // ——— Collaboration Zone: two shared tables ———
+  buildCollabTable(root, -0.1, -5.0, wood, woodWarm, blackMetal, plant, pot);
+  buildCollabTable(root, -0.1, -2.6, wood, woodWarm, blackMetal, plant, pot);
+
+  // ——— Social Zone ———
+  buildSocialZone(root, wood, woodWarm, sofaMat, loungeBlue, plant, plantDark, pot);
+
+  // ——— Meeting Zone (enclosed) ———
+  buildMeetingRoom(root, wood, woodWarm, woodDark, glassMat, frost, blackMetal, screenGlow, plant, pot);
+
+  // ——— Phone Zone ———
+  buildPhoneBooths(root, wood, woodWarm, blackMetal, partitionMat, screenGlow);
+
+  // ——— Reception Zone ———
+  buildReception(root, wood, woodWarm, blackMetal, sofaMat, plant, plantDark, pot, screenGlow);
+
+  // Biophilic floor plants throughout
+  const plantSpots = [
+    [-8.4, -6.4],
+    [-8.3, -0.8],
+    [-2.5, -6.5],
+    [1.8, -6.4],
+    [8.2, -6.3],
+    [8.3, -1.0],
+    [-8.3, 5.8],
+    [0.6, 1.2],
+    [8.0, 5.8],
+    [-0.1, -3.8],
   ];
-  for (const [hx, hz] of hangSpots) {
-    buildHangingPlant(root, hx, hz, plant, plantDark, pot, metal);
-  }
-
-  // Wall clock
-  const clock = cyl(0.3, 0.3, 0.05, mat(0xf8f4ec), 5.6, 2.7, -ROOM.d / 2 + 0.14, root, 32, false);
-  clock.rotation.x = Math.PI / 2;
-  box(0.02, 0.18, 0.01, blackMetal, 5.6, 2.78, -ROOM.d / 2 + 0.17, root, false);
-
-  // Whiteboard
-  box(1.7, 1.15, 0.04, mat(0xfafafa), ROOM.w / 2 - 0.14, 1.85, -0.4, root, false);
-  box(1.78, 1.22, 0.03, woodDark, ROOM.w / 2 - 0.16, 1.85, -0.42, root, false);
-
-  // Corner potted plants
-  for (const [px, pz] of [[-7.6, 4.8], [-7.5, -4.8], [7.4, 4.5]]) {
-    cyl(0.22, 0.18, 0.35, pot, px, 0.18, pz, root, 12);
-    const bush = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 12), plant);
-    bush.position.set(px, 0.55, pz);
-    bush.castShadow = true;
-    root.add(bush);
+  for (const [px, pz] of plantSpots) {
+    buildFloorPlant(root, px, pz, plant, plantDark, pot, 0.9 + (Math.abs(px) % 5) * 0.08);
   }
 
   const desks = deskLayout();
-  buildZoneOutlines(root, desks);
+  buildZoneOutlines(root);
 
   return { root, desks };
 }
 
-function buildWindowWall(root, wall, glassMat) {
-  const x = -ROOM.w / 2;
+function buildWindowWall(root, wall, charcoal, glassMat) {
+  const z = -ROOM.d / 2;
   const thick = 0.22;
-  box(thick, 0.5, ROOM.d, wall, x, ROOM.h - 0.25, 0, root);
-  box(thick, 0.4, ROOM.d, wall, x, 0.2, 0, root);
-  for (const z of [-ROOM.d / 2 + 0.12, -2.1, 1.9, ROOM.d / 2 - 0.12]) {
-    box(thick, ROOM.h, 0.16, wall, x, ROOM.h / 2, z, root);
+  // Sill + header + mullions (windows along top/back wall)
+  box(ROOM.w, 0.45, thick, wall, 0, 0.22, z, root);
+  box(ROOM.w, 0.4, thick, wall, 0, ROOM.h - 0.2, z, root);
+  for (const x of [-ROOM.w / 2 + 0.1, -4.5, -1.5, 1.5, 4.5, ROOM.w / 2 - 0.1]) {
+    box(0.14, ROOM.h, thick, charcoal, x, ROOM.h / 2, z, root);
   }
-  box(thick, 0.1, ROOM.d - 0.35, wall, x, 2.15, 0, root);
+  box(ROOM.w - 0.4, 0.08, thick, charcoal, 0, 1.85, z, root);
 
-  // Exterior anime skyline
-  const skyTex = createSkylineTexture(THREE);
-  const viewMat = new THREE.MeshBasicMaterial({ map: skyTex });
-  const view = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.d * 1.2, ROOM.h * 1.1), viewMat);
-  view.rotation.y = Math.PI / 2;
-  view.position.set(x - 2.2, ROOM.h / 2 - 0.05, 0);
+  // Soft plain sky behind glass — NOT a city mural
+  const skyTex = createSoftSkyTexture(THREE);
+  const view = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROOM.w * 1.05, ROOM.h * 1.05),
+    new THREE.MeshBasicMaterial({ map: skyTex }),
+  );
+  view.position.set(0, ROOM.h / 2 - 0.05, z - 1.6);
   root.add(view);
 
-  // Warm light wash on glass plane
   const wash = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROOM.d, ROOM.h),
-    new THREE.MeshBasicMaterial({ color: 0xffe6c4, transparent: true, opacity: 0.08 }),
+    new THREE.PlaneGeometry(ROOM.w - 0.5, ROOM.h - 0.6),
+    new THREE.MeshBasicMaterial({ color: 0xffe8c8, transparent: true, opacity: 0.07 }),
   );
-  wash.rotation.y = Math.PI / 2;
-  wash.position.set(x + 0.05, ROOM.h / 2, 0);
+  wash.position.set(0, ROOM.h / 2, z + 0.06);
   root.add(wash);
 
-  const paneH = 1.6;
-  const paneZs = [
-    [-ROOM.d / 2 + 1.15, 3.6],
-    [-0.1, 3.7],
-    [ROOM.d / 2 - 1.15, 3.6],
+  // Glass panes
+  const paneYs = [1.05, 2.65];
+  const paneXs = [
+    [-7.0, 4.4],
+    [-3.0, 4.4],
+    [0.0, 4.4],
+    [3.0, 4.4],
+    [7.0, 4.4],
   ];
-  for (const [cz, zw] of paneZs) {
-    for (const y of [1.08, 3.05]) {
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(zw, paneH), glassMat);
-      pane.rotation.y = Math.PI / 2;
-      pane.position.set(x + 0.1, y, cz);
+  for (const [cx, pw] of paneXs) {
+    for (const y of paneYs) {
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(pw, 1.35), glassMat);
+      pane.position.set(cx, y, z + 0.08);
       root.add(pane);
     }
   }
 }
 
-function buildCeilingGear(root, ductMat, metal, blackMetal) {
-  for (const z of [-3.4, 0.4, 3.4]) {
-    const duct = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, ROOM.w - 0.8, 14), ductMat);
-    duct.rotation.z = Math.PI / 2;
-    duct.position.set(0, ROOM.h - 0.38, z);
-    duct.castShadow = true;
-    root.add(duct);
+function buildEntranceWall(root, wall, charcoal, glassMat) {
+  const z = ROOM.d / 2;
+  const thick = 0.22;
+  // Left and right of entrance opening
+  box(6.2, ROOM.h, thick, wall, -5.9, ROOM.h / 2, z, root);
+  box(6.2, ROOM.h, thick, wall, 5.9, ROOM.h / 2, z, root);
+  // Header over doors
+  box(5.6, 0.9, thick, wall, 0, ROOM.h - 0.45, z, root);
+  // Door frames
+  box(0.12, 2.5, 0.1, charcoal, -1.35, 1.25, z - 0.05, root);
+  box(0.12, 2.5, 0.1, charcoal, 1.35, 1.25, z - 0.05, root);
+  box(2.8, 0.1, 0.1, charcoal, 0, 2.55, z - 0.05, root);
+  // Glass doors
+  for (const ox of [-0.65, 0.65]) {
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 2.35), glassMat);
+    door.position.set(ox, 1.2, z - 0.02);
+    root.add(door);
   }
-  for (const x of [-4.5, 0, 4.5]) {
-    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, ROOM.d - 0.6, 10), metal);
-    pipe.rotation.x = Math.PI / 2;
-    pipe.position.set(x, ROOM.h - 0.58, 0);
-    root.add(pipe);
+  // Entrance floor arrow hint (subtle)
+  const arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.28, 0.55, 3),
+    new THREE.MeshBasicMaterial({ color: 0x5a5a60, transparent: true, opacity: 0.35 }),
+  );
+  arrow.rotation.x = Math.PI / 2;
+  arrow.rotation.z = Math.PI;
+  arrow.position.set(0, 0.03, z - 1.1);
+  root.add(arrow);
+}
+
+/** Sparse warm pendants — open roof, no ducts/ceiling slab */
+function buildOpenPendants(root) {
+  const spots = [
+    [-5.2, -3.6],
+    [-0.1, -3.6],
+    [4.8, -3.6],
+    [-5.5, 3.2],
+    [3.2, 3.4],
+    [-1.4, 3.4],
+  ];
+  for (const [x, z] of spots) {
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.09, 10, 10),
+      new THREE.MeshStandardMaterial({
+        color: 0xffe2b5,
+        emissive: 0xffc878,
+        emissiveIntensity: 1.5,
+        roughness: 0.4,
+      }),
+    );
+    glow.position.set(x, ROOM.h - 0.55, z);
+    root.add(glow);
+    // Tiny shade disc (not a ceiling)
+    const shade = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.22, 0.06, 16),
+      mat(0xf5ebe0, { roughness: 0.7 }),
+    );
+    shade.position.set(x, ROOM.h - 0.48, z);
+    root.add(shade);
   }
-  for (const z of [-2.4, 0.9, 3.1]) {
-    box(ROOM.w - 1.6, 0.035, 0.055, blackMetal, 0, ROOM.h - 0.72, z, root, false);
-    for (let i = -3; i <= 3; i++) {
-      box(0.2, 0.14, 0.2, blackMetal, i * 2.15, ROOM.h - 0.84, z, root, false);
-      const tip = new THREE.Mesh(
-        new THREE.SphereGeometry(0.045, 8, 8),
-        new THREE.MeshStandardMaterial({
-          color: 0xffe2b5,
-          emissive: 0xffc878,
-          emissiveIntensity: 1.4,
-        }),
-      );
-      tip.position.set(i * 2.15, ROOM.h - 0.95, z);
-      root.add(tip);
+}
+
+function buildFocusDesk(root, x, z, wood, woodWarm, blackMetal, screenGlow, plant, pot, partitionMat) {
+  const h = 0.74;
+  box(1.35, 0.05, 0.72, wood, x, h, z, root);
+  box(1.25, 0.04, 0.62, woodWarm, x, h - 0.05, z, root, false);
+  for (const [lx, lz] of [
+    [-0.58, -0.28],
+    [0.58, -0.28],
+    [-0.58, 0.28],
+    [0.58, 0.28],
+  ]) {
+    box(0.04, h, 0.04, blackMetal, x + lx, h / 2, z + lz, root);
+  }
+  // Privacy partition behind monitors
+  box(1.3, 0.48, 0.04, partitionMat, x, h + 0.28, z - 0.34, root);
+  // Single warm monitor
+  box(0.55, 0.36, 0.03, blackMetal, x, h + 0.36, z - 0.22, root);
+  box(0.5, 0.3, 0.012, screenGlow, x, h + 0.36, z - 0.2, root, false);
+  box(0.08, 0.14, 0.06, blackMetal, x, h + 0.1, z - 0.22, root, false);
+  box(0.22, 0.02, 0.14, blackMetal, x, h + 0.02, z - 0.18, root, false);
+  // Keyboard
+  box(0.36, 0.015, 0.18, blackMetal, x, h + 0.03, z + 0.12, root, false);
+  // Chair
+  const seat = mat(0x2c3038, { roughness: 0.72 });
+  const chairZ = z + 0.58;
+  box(0.5, 0.08, 0.5, seat, x, 0.435, chairZ, root);
+  box(0.5, 0.52, 0.07, seat, x, 0.72, chairZ + 0.2, root);
+  cyl(0.055, 0.055, 0.34, blackMetal, x, 0.22, chairZ, root, 10, false);
+  cyl(0.18, 0.18, 0.04, blackMetal, x, 0.08, chairZ, root, 12, false);
+  // Desk plant + mug
+  cyl(0.05, 0.06, 0.06, pot, x + 0.5, h + 0.045, z + 0.2, root, 10, false);
+  const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.2, 8), plant);
+  leaf.position.set(x + 0.5, h + 0.18, z + 0.2);
+  root.add(leaf);
+  cyl(0.032, 0.028, 0.065, mat(0xf8f4ec), x - 0.48, h + 0.05, z + 0.18, root, 10, false);
+}
+
+function buildCollabTable(root, x, z, wood, woodWarm, blackMetal, plant, pot) {
+  box(3.2, 0.06, 1.35, wood, x, 0.74, z, root);
+  for (const [lx, lz] of [
+    [-1.35, -0.5],
+    [1.35, -0.5],
+    [-1.35, 0.5],
+    [1.35, 0.5],
+  ]) {
+    box(0.08, 0.72, 0.08, woodWarm, x + lx, 0.36, z + lz, root);
+  }
+  // Center plant
+  cyl(0.08, 0.1, 0.1, pot, x, 0.82, z, root, 10, false);
+  const bush = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), plant);
+  bush.position.set(x, 1.02, z);
+  root.add(bush);
+  // Chairs (3 each long side) + laptop slabs
+  const seat = mat(0x2c3038, { roughness: 0.72 });
+  for (const side of [-1, 1]) {
+    for (let i = -1; i <= 1; i++) {
+      const cx = x + i * 0.95;
+      const cz = z + side * 0.95;
+      box(0.42, 0.07, 0.42, seat, cx, 0.42, cz, root);
+      box(0.42, 0.4, 0.06, seat, cx, 0.65, cz + side * 0.18, root);
+      cyl(0.05, 0.05, 0.3, blackMetal, cx, 0.2, cz, root, 8, false);
     }
   }
+  for (const ox of [-0.9, 0, 0.9]) {
+    box(0.32, 0.015, 0.22, blackMetal, x + ox, 0.78, z + 0.25, root, false);
+    box(0.32, 0.015, 0.22, blackMetal, x + ox, 0.78, z - 0.25, root, false);
+  }
 }
 
-function buildDesk(root, x, z, wood, woodDark, blackMetal, screenGlow, plant, pot, tall = false) {
-  const h = tall ? 1.05 : 0.74;
-  box(1.45, 0.05, 0.78, wood, x, h, z, root);
-  // Underframe
-  box(1.35, 0.04, 0.68, woodDark, x, h - 0.05, z, root, false);
-  for (const [lx, lz] of [[-0.62, -0.3], [0.62, -0.3], [-0.62, 0.3], [0.62, 0.3]]) {
-    box(0.045, h, 0.045, blackMetal, x + lx, h / 2, z + lz, root);
+function buildSocialZone(root, wood, woodWarm, sofaMat, loungeBlue, plant, plantDark, pot) {
+  // Planter divider vs collaboration
+  box(0.55, 0.55, 4.8, woodWarm, 2.35, 0.28, -3.6, root);
+  box(0.48, 0.08, 4.6, mat(0x5a4030, { roughness: 0.85 }), 2.35, 0.58, -3.6, root, false);
+  for (let i = 0; i < 7; i++) {
+    const pz = -5.6 + i * 0.7;
+    const bush = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28 + (i % 3) * 0.04, 10, 10),
+      i % 2 ? plant : plantDark,
+    );
+    bush.position.set(2.35, 0.95, pz);
+    bush.castShadow = true;
+    root.add(bush);
   }
-  // Dual monitors with stands
-  for (const ox of [-0.3, 0.34]) {
-    box(0.52, 0.34, 0.03, blackMetal, x + ox, h + 0.34, z - 0.24, root);
-    box(0.48, 0.29, 0.012, screenGlow, x + ox, h + 0.34, z - 0.22, root, false);
-    box(0.08, 0.16, 0.06, blackMetal, x + ox, h + 0.1, z - 0.24, root, false);
-    box(0.22, 0.02, 0.14, blackMetal, x + ox, h + 0.02, z - 0.2, root, false);
-  }
-  box(0.36, 0.015, 0.2, blackMetal, x, h + 0.03, z + 0.12, root, false);
-  // Chair — seat top at CHAIR.seatY (0.475); center at z + CHAIR.offsetZ
-  const seat = mat(0x262c34, { roughness: 0.7 });
-  const chairZ = z + 0.58;
-  box(0.52, 0.08, 0.52, seat, x, 0.435, chairZ, root); // top ≈ 0.475
-  box(0.52, 0.55, 0.08, seat, x, 0.74, chairZ + 0.22, root);
-  cyl(0.06, 0.06, 0.35, blackMetal, x, 0.22, chairZ, root, 10, false);
-  cyl(0.2, 0.2, 0.04, blackMetal, x, 0.08, chairZ, root, 12, false);
-  // Desk plant + mug
-  cyl(0.055, 0.07, 0.07, pot, x + 0.55, h + 0.05, z + 0.22, root, 10, false);
-  const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.22, 8), plant);
-  leaf.position.set(x + 0.55, h + 0.2, z + 0.22);
-  root.add(leaf);
-  cyl(0.035, 0.03, 0.07, mat(0xf5f5f5), x - 0.5, h + 0.06, z + 0.2, root, 10, false);
+
+  // Long sofa along +X wall
+  box(0.85, 0.42, 3.6, sofaMat, 7.6, 0.32, -3.8, root);
+  box(0.18, 0.4, 3.6, sofaMat, 7.95, 0.68, -3.8, root);
+  // Blue lounge chair
+  box(0.7, 0.38, 0.7, loungeBlue, 5.4, 0.3, -5.8, root);
+  box(0.7, 0.45, 0.12, loungeBlue, 5.4, 0.7, -6.1, root);
+  // Coffee tables + ottoman
+  cyl(0.32, 0.32, 0.08, wood, 6.2, 0.28, -3.6, root, 20);
+  cyl(0.06, 0.06, 0.26, woodWarm, 6.2, 0.13, -3.6, root, 10, false);
+  cyl(0.28, 0.28, 0.08, wood, 6.8, 0.28, -2.4, root, 20);
+  cyl(0.06, 0.06, 0.26, woodWarm, 6.8, 0.13, -2.4, root, 10, false);
+  box(0.55, 0.28, 0.55, mat(0xf5f0e8, { roughness: 0.92 }), 5.0, 0.2, -2.8, root);
+  // Corner plant
+  buildFloorPlant(root, 8.0, -5.9, plant, plantDark, pot, 1.25);
+  buildFloorPlant(root, 8.1, -1.2, plant, plantDark, pot, 1.05);
 }
 
-function buildMeetingRoom(root, wood, woodDark, glassMat, frost, blackMetal) {
-  const cx = 3.4;
-  const cz = -3.2;
-  const gw = 4.2;
-  const gd = 3.4;
-  const gh = 2.65;
-  const rug = new THREE.Mesh(new THREE.PlaneGeometry(gw, gd), mat(0xcbb9a2, { roughness: 0.9 }));
-  rug.rotation.x = -Math.PI / 2;
-  rug.position.set(cx, 0.014, cz);
-  root.add(rug);
-  const panes = [
-    { w: gw, d: 0.05, x: cx, z: cz - gd / 2 },
-    { w: gw, d: 0.05, x: cx, z: cz + gd / 2 },
-    { w: 0.05, d: gd, x: cx - gw / 2, z: cz },
-    { w: 0.05, d: gd, x: cx + gw / 2, z: cz },
-  ];
-  for (const p of panes) {
-    const g = new THREE.Mesh(new THREE.BoxGeometry(p.w, gh, p.d), glassMat);
-    g.position.set(p.x, gh / 2, p.z);
-    root.add(g);
-    const f = new THREE.Mesh(new THREE.BoxGeometry(p.w * 0.98, 0.9, p.d * 1.25), frost);
-    f.position.set(p.x, 0.58, p.z);
-    root.add(f);
-  }
+function buildMeetingRoom(root, wood, woodWarm, woodDark, glassMat, frost, blackMetal, screenGlow, plant, pot) {
+  const cx = -5.6;
+  const cz = 3.4;
+  const gw = 5.0;
+  const gd = 4.6;
+  const gh = 2.55;
+
+  // Solid-ish warm walls with glass fronts
+  box(gw, gh, 0.08, frost, cx, gh / 2, cz - gd / 2, root);
+  box(0.08, gh, gd, frost, cx - gw / 2, gh / 2, cz, root);
+  box(0.08, gh, gd, frost, cx + gw / 2, gh / 2, cz, root);
+  // Door gap on +Z side
+  box(gw * 0.35, gh, 0.08, frost, cx - gw * 0.3, gh / 2, cz + gd / 2, root);
+  box(gw * 0.35, gh, 0.08, frost, cx + gw * 0.3, gh / 2, cz + gd / 2, root);
   for (const [fx, fz] of [
     [cx - gw / 2, cz - gd / 2],
     [cx + gw / 2, cz - gd / 2],
@@ -374,50 +571,138 @@ function buildMeetingRoom(root, wood, woodDark, glassMat, frost, blackMetal) {
   ]) {
     box(0.1, gh, 0.1, blackMetal, fx, gh / 2, fz, root);
   }
-  box(2.5, 0.06, 1.25, wood, cx, 0.74, cz, root);
-  for (const [lx, lz] of [[-0.95, -0.42], [0.95, -0.42], [-0.95, 0.42], [0.95, 0.42]]) {
-    box(0.08, 0.72, 0.08, woodDark, cx + lx, 0.36, cz + lz, root);
+  // Glass upper strips
+  for (const side of [
+    { w: gw - 0.2, d: 0.04, x: cx, z: cz - gd / 2 + 0.02 },
+    { w: 0.04, d: gd - 0.2, x: cx - gw / 2 + 0.02, z: cz },
+    { w: 0.04, d: gd - 0.2, x: cx + gw / 2 - 0.02, z: cz },
+  ]) {
+    const g = new THREE.Mesh(new THREE.BoxGeometry(side.w, 1.1, side.d), glassMat);
+    g.position.set(side.x, 1.85, side.z);
+    root.add(g);
   }
-  // Lead workstation: laptop on +Z edge of table + office chair
-  const leadX = 3.2;
-  const leadDeskZ = -2.8;
-  const leadChairZ = leadDeskZ + 0.58;
-  box(0.42, 0.02, 0.28, blackMetal, leadX, 0.78, leadDeskZ - 0.05, root, false);
-  box(0.38, 0.24, 0.015, mat(0x9ad0ef, { roughness: 0.25, emissive: 0x4a88aa, emissiveIntensity: 0.55 }), leadX, 0.92, leadDeskZ - 0.16, root, false);
-  const seat = mat(0x262c34, { roughness: 0.7 });
-  box(0.52, 0.08, 0.52, seat, leadX, 0.435, leadChairZ, root);
-  box(0.52, 0.55, 0.08, seat, leadX, 0.74, leadChairZ + 0.22, root);
-  cyl(0.06, 0.06, 0.35, blackMetal, leadX, 0.22, leadChairZ, root, 10, false);
-  cyl(0.2, 0.2, 0.04, blackMetal, leadX, 0.08, leadChairZ, root, 12, false);
-}
 
-function buildPantry(root, wood, woodDark, metal) {
-  const x = ROOM.w / 2 - 0.95;
-  box(1.5, 0.92, 3.4, wood, x, 0.46, -2.2, root);
-  box(1.5, 0.05, 3.4, mat(0xebe7df, { roughness: 0.4 }), x, 0.94, -2.2, root);
-  box(0.75, 0.75, 2.5, woodDark, x + 0.28, 2.35, -2.4, root);
-  box(0.3, 0.38, 0.24, metal, x - 0.25, 1.15, -1.15, root);
-  box(0.34, 1.15, 0.34, mat(0xeef2f5), x - 0.2, 0.58, -3.45, root);
-  cyl(0.13, 0.13, 0.38, mat(0xa8d4f0, { transparent: true, opacity: 0.72 }), x - 0.2, 1.35, -3.45, root, 12, false);
-}
+  // Conference table + 8 chairs
+  box(2.8, 0.06, 1.3, wood, cx, 0.74, cz, root);
+  for (const [lx, lz] of [
+    [-1.1, -0.45],
+    [1.1, -0.45],
+    [-1.1, 0.45],
+    [1.1, 0.45],
+  ]) {
+    box(0.08, 0.72, 0.08, woodWarm, cx + lx, 0.36, cz + lz, root);
+  }
+  const seat = mat(0x2c3038, { roughness: 0.72 });
+  const chairSpots = [
+    [-0.9, -0.95],
+    [0, -0.95],
+    [0.9, -0.95],
+    [-0.9, 0.95],
+    [0, 0.95],
+    [0.9, 0.95],
+    [-1.55, 0],
+    [1.55, 0],
+  ];
+  for (const [ox, oz] of chairSpots) {
+    box(0.42, 0.07, 0.42, seat, cx + ox, 0.42, cz + oz, root);
+    box(0.42, 0.4, 0.06, seat, cx + ox, 0.65, cz + oz + (oz === 0 ? (ox > 0 ? 0.18 : -0.18) : Math.sign(oz) * 0.18), root);
+  }
 
-function buildHangingPlant(root, x, z, plant, plantDark, pot, metal) {
-  const y = ROOM.h - 0.95;
-  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.75, 6), metal);
-  cord.position.set(x, ROOM.h - 0.38, z);
-  root.add(cord);
-  cyl(0.2, 0.15, 0.22, pot, x, y, z, root, 12, false);
-  const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 12), plant);
-  leaf.position.set(x, y - 0.18, z);
-  leaf.scale.set(1, 1.15, 1);
-  leaf.castShadow = true;
+  // Wall display on −X inner wall
+  box(0.06, 1.1, 1.8, blackMetal, cx - gw / 2 + 0.12, 1.55, cz, root);
+  box(0.04, 1.0, 1.65, screenGlow, cx - gw / 2 + 0.16, 1.55, cz, root, false);
+
+  cyl(0.08, 0.1, 0.12, pot, cx - 1.8, 0.1, cz + 1.8, root, 10, false);
+  const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10), plant);
+  leaf.position.set(cx - 1.8, 0.45, cz + 1.8);
   root.add(leaf);
-  const leaf2 = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 10), plantDark);
-  leaf2.position.set(x + 0.16, y - 0.3, z + 0.06);
-  root.add(leaf2);
-  const leaf3 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), plant);
-  leaf3.position.set(x - 0.14, y - 0.32, z - 0.1);
-  root.add(leaf3);
+}
+
+function buildPhoneBooths(root, wood, woodWarm, blackMetal, partitionMat, screenGlow) {
+  const baseX = -1.4;
+  const baseZ = 3.6;
+  // Outer shell
+  box(2.4, 2.3, 0.08, partitionMat, baseX, 1.15, baseZ - 1.9, root);
+  box(2.4, 2.3, 0.08, partitionMat, baseX, 1.15, baseZ + 1.9, root);
+  box(0.08, 2.3, 3.8, partitionMat, baseX - 1.2, 1.15, baseZ, root);
+  // Center divider → two booths
+  box(0.08, 2.1, 3.5, partitionMat, baseX, 1.05, baseZ, root);
+  box(0.08, 2.3, 3.8, frostLite(), baseX + 1.2, 1.15, baseZ, root);
+
+  for (const side of [-1, 1]) {
+    const bx = baseX + side * 0.55;
+    const bz = baseZ;
+    box(0.9, 0.05, 0.55, wood, bx, 0.74, bz, root);
+    box(0.42, 0.32, 0.03, blackMetal, bx, 1.05, bz - 0.18, root);
+    box(0.38, 0.26, 0.012, screenGlow, bx, 1.05, bz - 0.16, root, false);
+    const seat = mat(0x2c3038, { roughness: 0.72 });
+    box(0.4, 0.07, 0.4, seat, bx, 0.42, bz + 0.45, root);
+    box(0.4, 0.4, 0.06, seat, bx, 0.65, bz + 0.62, root);
+  }
+
+  function frostLite() {
+    return new THREE.MeshPhysicalMaterial({
+      color: 0xf5ebe0,
+      roughness: 0.65,
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.DoubleSide,
+    });
+  }
+}
+
+function buildReception(root, wood, woodWarm, blackMetal, sofaMat, plant, plantDark, pot, screenGlow) {
+  // L-shaped reception desk
+  // Main span (facing entrance, along X)
+  box(3.2, 0.95, 0.7, wood, 2.4, 0.48, 4.55, root);
+  box(3.2, 0.05, 0.75, woodWarm, 2.4, 0.98, 4.55, root);
+  // Return leg toward −Z
+  box(0.7, 0.95, 2.0, wood, 3.65, 0.48, 3.4, root);
+  box(0.75, 0.05, 2.0, woodWarm, 3.65, 0.98, 3.4, root);
+  // Monitor on desk
+  box(0.5, 0.34, 0.03, blackMetal, 2.4, 1.25, 4.35, root);
+  box(0.46, 0.28, 0.012, screenGlow, 2.4, 1.25, 4.33, root, false);
+  // Reception chair (behind desk, toward −Z)
+  const seat = mat(0x2c3038, { roughness: 0.72 });
+  const chairZ = 4.2 - 0.55;
+  box(0.5, 0.08, 0.5, seat, 2.4, 0.435, chairZ, root);
+  box(0.5, 0.52, 0.07, seat, 2.4, 0.72, chairZ - 0.2, root);
+  cyl(0.055, 0.055, 0.34, blackMetal, 2.4, 0.22, chairZ, root, 10, false);
+
+  // Tall green wall / planter separating waiting area
+  box(0.5, 2.2, 3.2, woodWarm, 5.4, 1.1, 3.6, root);
+  box(0.42, 0.12, 3.0, mat(0x4a3520, { roughness: 0.85 }), 5.4, 2.25, 3.6, root, false);
+  for (let i = 0; i < 8; i++) {
+    const pz = 2.2 + i * 0.35;
+    const bush = new THREE.Mesh(
+      new THREE.SphereGeometry(0.32, 10, 10),
+      i % 2 ? plant : plantDark,
+    );
+    bush.position.set(5.4, 1.6 + (i % 3) * 0.15, pz);
+    bush.castShadow = true;
+    root.add(bush);
+  }
+
+  // Waiting chairs + side table
+  box(0.7, 0.4, 0.7, sofaMat, 7.0, 0.32, 4.6, root);
+  box(0.7, 0.45, 0.12, sofaMat, 7.0, 0.7, 4.9, root);
+  box(0.7, 0.4, 0.7, sofaMat, 7.0, 0.32, 3.2, root);
+  box(0.7, 0.45, 0.12, sofaMat, 7.0, 0.7, 2.9, root);
+  cyl(0.28, 0.28, 0.08, wood, 7.9, 0.28, 3.9, root, 18);
+  cyl(0.05, 0.05, 0.26, woodWarm, 7.9, 0.13, 3.9, root, 10, false);
+
+  buildFloorPlant(root, 8.2, 5.5, plant, plantDark, pot, 1.15);
+}
+
+function buildFloorPlant(root, x, z, plant, plantDark, pot, scale = 1) {
+  cyl(0.16 * scale, 0.13 * scale, 0.28 * scale, pot, x, 0.14 * scale, z, root, 12);
+  const bush = new THREE.Mesh(new THREE.SphereGeometry(0.35 * scale, 12, 12), plant);
+  bush.position.set(x, 0.42 * scale, z);
+  bush.castShadow = true;
+  root.add(bush);
+  const bush2 = new THREE.Mesh(new THREE.SphereGeometry(0.22 * scale, 10, 10), plantDark);
+  bush2.position.set(x + 0.12 * scale, 0.5 * scale, z + 0.08 * scale);
+  root.add(bush2);
 }
 
 function makeWoodFloorMaterial() {
@@ -425,18 +710,17 @@ function makeWoodFloorMaterial() {
   c.width = 512;
   c.height = 512;
   const g = c.getContext('2d');
-  g.fillStyle = '#d2b48c';
+  g.fillStyle = '#d8b892';
   g.fillRect(0, 0, 512, 512);
   for (let i = 0; i < 16; i++) {
     const y = i * 32;
-    g.fillStyle = i % 2 === 0 ? '#c9a87a' : '#d8bc96';
+    g.fillStyle = i % 2 === 0 ? '#c9a07a' : '#d8b892';
     g.fillRect(0, y, 512, 32);
-    g.strokeStyle = 'rgba(120, 80, 40, 0.18)';
+    g.strokeStyle = 'rgba(130, 90, 50, 0.16)';
     g.beginPath();
     g.moveTo(0, y + 31);
     g.lineTo(512, y + 31);
     g.stroke();
-    // plank seams
     for (let x = (i % 2) * 64; x < 512; x += 128) {
       g.beginPath();
       g.moveTo(x, y);
@@ -446,72 +730,61 @@ function makeWoodFloorMaterial() {
   }
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(6, 4);
+  tex.repeat.set(7, 5);
   tex.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.82, metalness: 0.02 });
+  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0.02 });
 }
 
-function buildZoneOutlines(root, desks) {
-  const byId = new Map(TEAM.map((m) => [m.id, m]));
-  for (const [id, desk] of desks) {
-    const member = byId.get(id);
-    if (!member) continue;
-    const color = new THREE.Color(member.color);
-    const w = desk.zone === 'lead' ? 2.2 : 1.7;
-    const d = desk.zone === 'lead' ? 2.0 : 1.55;
-    // Glowing floor rectangle (edges only via thin boxes)
+function buildZoneOutlines(root) {
+  for (const z of ZONES) {
+    const color = new THREE.Color(z.color);
     const edgeMat = new THREE.MeshBasicMaterial({
       color,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.75,
     });
-    const y = 0.02;
-    const cx = desk.x;
-    const cz = desk.z + 0.2;
-    const t = 0.035;
-    const hw = w / 2;
-    const hd = d / 2;
-    const mk = (bw, bd, x, z) => {
+    const y = 0.022;
+    const t = 0.04;
+    const hw = z.w / 2;
+    const hd = z.d / 2;
+    const mk = (bw, bd, x, zz) => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.012, bd), edgeMat.clone());
-      m.position.set(x, y, z);
+      m.position.set(x, y, zz);
       root.add(m);
     };
-    mk(w, t, cx, cz - hd);
-    mk(w, t, cx, cz + hd);
-    mk(t, d, cx - hw, cz);
-    mk(t, d, cx + hw, cz);
+    mk(z.w, t, z.x, z.z - hd);
+    mk(z.w, t, z.x, z.z + hd);
+    mk(t, z.d, z.x - hw, z.z);
+    mk(t, z.d, z.x + hw, z.z);
 
-    // Soft fill
     const fill = new THREE.Mesh(
-      new THREE.PlaneGeometry(w - 0.08, d - 0.08),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.07, depthWrite: false }),
+      new THREE.PlaneGeometry(z.w - 0.1, z.d - 0.1),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.05, depthWrite: false }),
     );
     fill.rotation.x = -Math.PI / 2;
-    fill.position.set(cx, 0.015, cz);
+    fill.position.set(z.x, 0.018, z.z);
     root.add(fill);
 
-    // Zone label sprite (deptZh preferred, short)
-    const label = member.deptZh || member.deptEn;
-    const short = label.length > 8 ? label.slice(0, 7) + '…' : label;
+    // Bilingual zone label
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 64;
+    canvas.width = 320;
+    canvas.height = 80;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 256, 64);
-    ctx.font = '600 22px "Noto Sans TC", sans-serif';
+    ctx.clearRect(0, 0, 320, 80);
+    ctx.font = '700 26px "Noto Sans TC", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillText(short, 129, 34);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillText(`${z.labelEn} · ${z.labelZh}`, 161, 42);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(short, 128, 32);
+    ctx.fillText(`${z.labelEn} · ${z.labelZh}`, 160, 40);
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     const spr = new THREE.Sprite(
       new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }),
     );
-    spr.scale.set(1.35, 0.34, 1);
-    spr.position.set(cx, 0.08, cz + hd + 0.15);
+    spr.scale.set(2.4, 0.6, 1);
+    spr.position.set(z.x, 0.12, z.z + hd - 0.35);
     root.add(spr);
   }
 }
@@ -520,37 +793,45 @@ function buildZoneOutlines(root, desks) {
  * @returns {{ hemi: THREE.HemisphereLight, sun: THREE.DirectionalLight, fill: THREE.DirectionalLight, ambient: THREE.AmbientLight, points: THREE.PointLight[] }}
  */
 export function setupLighting(scene) {
-  scene.background = new THREE.Color(0xdfe8f2);
-  scene.fog = new THREE.Fog(0xdfe8f2, 22, 55);
+  // Soft warm void — no outdoor panorama
+  scene.background = new THREE.Color(0xe8e0d4);
+  scene.fog = new THREE.Fog(0xe8e0d4, 28, 65);
 
-  const hemi = new THREE.HemisphereLight(0xfff1dd, 0x7e95ae, 0.95);
+  const hemi = new THREE.HemisphereLight(0xfff2e0, 0xb8a890, 1.0);
   scene.add(hemi);
 
-  const sun = new THREE.DirectionalLight(0xffe0b0, 2.6);
-  sun.position.set(-14, 11, 5);
+  const sun = new THREE.DirectionalLight(0xffe2b8, 2.2);
+  sun.position.set(-6, 14, -10);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 2;
-  sun.shadow.camera.far = 45;
-  sun.shadow.camera.left = -16;
-  sun.shadow.camera.right = 16;
-  sun.shadow.camera.top = 14;
-  sun.shadow.camera.bottom = -14;
+  sun.shadow.camera.far = 50;
+  sun.shadow.camera.left = -18;
+  sun.shadow.camera.right = 18;
+  sun.shadow.camera.top = 16;
+  sun.shadow.camera.bottom = -16;
   sun.shadow.bias = -0.00025;
   sun.shadow.normalBias = 0.02;
   scene.add(sun);
 
-  const fill = new THREE.DirectionalLight(0xb7cae0, 0.55);
-  fill.position.set(8, 9, -6);
+  const fill = new THREE.DirectionalLight(0xd4c4b0, 0.5);
+  fill.position.set(10, 8, 6);
   scene.add(fill);
 
-  const ambient = new THREE.AmbientLight(0xfff6ec, 0.4);
+  const ambient = new THREE.AmbientLight(0xfff5ea, 0.48);
   scene.add(ambient);
 
   const points = [];
-  for (const [x, z, i] of [[-4, 2, 0.7], [0, 0.2, 0.6], [3.2, 2, 0.55], [-2, -3, 0.5], [5, -2, 0.45]]) {
-    const p = new THREE.PointLight(0xffd6a0, i, 9, 2);
-    p.position.set(x, 3.35, z);
+  for (const [x, z, i] of [
+    [-5.2, -3.6, 0.65],
+    [-0.1, -3.6, 0.55],
+    [4.8, -3.6, 0.55],
+    [-5.5, 3.2, 0.5],
+    [3.2, 3.4, 0.5],
+    [-1.4, 3.4, 0.4],
+  ]) {
+    const p = new THREE.PointLight(0xffd6a0, i, 10, 2);
+    p.position.set(x, 2.9, z);
     scene.add(p);
     points.push(p);
   }
@@ -562,7 +843,11 @@ export function setupLighting(scene) {
 export function applyLightingMode(scene, lights, mode) {
   let resolved = mode;
   if (mode === 'now') {
-    const h = new Date().toLocaleString('en-US', { timeZone: 'Asia/Hong_Kong', hour: 'numeric', hour12: false });
+    const h = new Date().toLocaleString('en-US', {
+      timeZone: 'Asia/Hong_Kong',
+      hour: 'numeric',
+      hour12: false,
+    });
     const hour = Number(h);
     if (hour >= 6 && hour < 16) resolved = 'day';
     else if (hour >= 16 && hour < 20) resolved = 'evening';
@@ -571,51 +856,51 @@ export function applyLightingMode(scene, lights, mode) {
 
   const presets = {
     day: {
-      bg: 0xdfe8f2,
-      fog: 0xdfe8f2,
-      hemiSky: 0xfff1dd,
-      hemiGround: 0x7e95ae,
-      hemiI: 0.95,
-      sunC: 0xffe0b0,
-      sunI: 2.6,
-      fillC: 0xb7cae0,
-      fillI: 0.55,
-      ambC: 0xfff6ec,
-      ambI: 0.4,
+      bg: 0xe8e0d4,
+      fog: 0xe8e0d4,
+      hemiSky: 0xfff2e0,
+      hemiGround: 0xb8a890,
+      hemiI: 1.0,
+      sunC: 0xffe2b8,
+      sunI: 2.2,
+      fillC: 0xd4c4b0,
+      fillI: 0.5,
+      ambC: 0xfff5ea,
+      ambI: 0.48,
       pointC: 0xffd6a0,
       pointMul: 1,
-      exposure: 1.12,
+      exposure: 1.1,
     },
     evening: {
-      bg: 0xc4a484,
-      fog: 0xc4a484,
+      bg: 0xd4b896,
+      fog: 0xd4b896,
       hemiSky: 0xffc9a0,
-      hemiGround: 0x6a5a78,
-      hemiI: 0.75,
+      hemiGround: 0x8a7060,
+      hemiI: 0.8,
       sunC: 0xff8a4a,
-      sunI: 1.8,
-      fillC: 0x8a6aaa,
+      sunI: 1.6,
+      fillC: 0xc4a080,
       fillI: 0.4,
-      ambC: 0xffd0b0,
-      ambI: 0.35,
+      ambC: 0xffd8b8,
+      ambI: 0.38,
       pointC: 0xffb070,
-      pointMul: 1.15,
-      exposure: 1.05,
+      pointMul: 1.2,
+      exposure: 1.02,
     },
     night: {
-      bg: 0x0e1628,
-      fog: 0x0e1628,
-      hemiSky: 0x3a4a6a,
-      hemiGround: 0x1a2030,
-      hemiI: 0.35,
-      sunC: 0x6a8abb,
-      sunI: 0.35,
-      fillC: 0x405070,
-      fillI: 0.25,
-      ambC: 0x1a2438,
-      ambI: 0.25,
-      pointC: 0x7ec8ff,
-      pointMul: 1.6,
+      bg: 0x1a1820,
+      fog: 0x1a1820,
+      hemiSky: 0x3a3a50,
+      hemiGround: 0x1a1820,
+      hemiI: 0.32,
+      sunC: 0x6a7a9a,
+      sunI: 0.3,
+      fillC: 0x405060,
+      fillI: 0.22,
+      ambC: 0x1e2030,
+      ambI: 0.28,
+      pointC: 0xffc890,
+      pointMul: 1.7,
       exposure: 0.95,
     },
   };
@@ -633,7 +918,7 @@ export function applyLightingMode(scene, lights, mode) {
   lights.fill.intensity = p.fillI;
   lights.ambient.color.setHex(p.ambC);
   lights.ambient.intensity = p.ambI;
-  const base = [0.7, 0.6, 0.55, 0.5, 0.45];
+  const base = [0.65, 0.55, 0.55, 0.5, 0.5, 0.4];
   lights.points.forEach((pt, i) => {
     pt.color.setHex(p.pointC);
     pt.intensity = (base[i] ?? 0.5) * p.pointMul;
@@ -653,14 +938,14 @@ export function createRenderer(canvas) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.12;
+  renderer.toneMappingExposure = 1.1;
   return renderer;
 }
 
 /** Elevated isometric / dollhouse cutaway framing. */
 export function createCamera(aspect) {
-  const camera = new THREE.PerspectiveCamera(38, aspect, 0.1, 80);
-  camera.position.set(11.5, 9.2, 11.8);
-  camera.lookAt(-0.5, 0.4, 0.2);
+  const camera = new THREE.PerspectiveCamera(40, aspect, 0.1, 90);
+  camera.position.set(12.5, 11.5, 13.5);
+  camera.lookAt(0.2, 0.3, 0.2);
   return camera;
 }
