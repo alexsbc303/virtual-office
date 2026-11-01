@@ -1,21 +1,22 @@
 /**
  * Procedural cute stylized 3D plush/chibi figures for AS Virtual Office.
- * figureType keys (code-only): bubu | dudu | melody | rilakkuma
+ * Display uses the rilakkuma (golden-brown relaxed bear) silhouette only.
+ * Figures are built in a seated desk pose (hips on chair, arms to keyboard).
  * Original meshes — no branded assets or trademarked UI strings.
  */
 import * as THREE from 'three';
 
-/** @typedef {'bubu'|'dudu'|'melody'|'rilakkuma'} FigureType */
+/** @typedef {'rilakkuma'} FigureType */
 
-export const FIGURE_TYPES = /** @type {const} */ (['bubu', 'dudu', 'melody', 'rilakkuma']);
+export const FIGURE_TYPES = /** @type {const} */ (['rilakkuma']);
 
 /**
- * Cycle four figure silhouettes across the roster. Lead (index 0) → bubu.
- * @param {number} index
+ * All bots use the rilakkuma silhouette (kept for API compatibility).
+ * @param {number} _index
  * @returns {FigureType}
  */
-export function figureTypeForIndex(index) {
-  return FIGURE_TYPES[((index % 4) + 4) % 4];
+export function figureTypeForIndex(_index) {
+  return 'rilakkuma';
 }
 
 function softMat(color, opts = {}) {
@@ -61,197 +62,28 @@ function shadeHex(hex, f) {
   return (r << 16) | (g << 8) | b;
 }
 
-/** Shared face: simple dots + shine for plush readability */
-function addPlushFace(head, opts = {}) {
-  const eyeMat = softMat(0x2a2a32, { roughness: 0.45 });
-  const shineMat = softMat(0xffffff, { roughness: 0.2, emissive: 0xffffff, emissiveIntensity: 0.15 });
-  const noseMat = softMat(opts.noseColor ?? 0x3a2a28, { roughness: 0.5 });
-  const blushMat = softMat(0xf48fb1, { roughness: 0.9, transparent: true, opacity: 0.45 });
-
-  const eyeY = opts.eyeY ?? 0.06;
-  const eyeZ = opts.eyeZ ?? 0.28;
-  const eyeX = opts.eyeX ?? 0.11;
-  const eyeR = opts.eyeR ?? 0.045;
-
-  addSphere(head, eyeR, eyeMat, -eyeX, eyeY, eyeZ, 1, 1.15, 0.85, 16);
-  addSphere(head, eyeR, eyeMat, eyeX, eyeY, eyeZ, 1, 1.15, 0.85, 16);
-  addSphere(head, eyeR * 0.35, shineMat, -eyeX - 0.015, eyeY + 0.02, eyeZ + 0.03, 1, 1, 1, 10);
-  addSphere(head, eyeR * 0.35, shineMat, eyeX - 0.015, eyeY + 0.02, eyeZ + 0.03, 1, 1, 1, 10);
-
-  const nose = addSphere(head, opts.noseR ?? 0.04, noseMat, 0, eyeY - 0.08, eyeZ + 0.04, 1.1, 0.85, 0.9, 12);
-  void nose;
-
-  if (opts.blush !== false) {
-    addSphere(head, 0.05, blushMat, -eyeX - 0.06, eyeY - 0.1, eyeZ - 0.02, 1.4, 0.7, 0.5, 10);
-    addSphere(head, 0.05, blushMat, eyeX + 0.06, eyeY - 0.1, eyeZ - 0.02, 1.4, 0.7, 0.5, 10);
-  }
-
-  // Tiny smile (dark torus segment as flattened torus)
-  const smileMat = softMat(0x5d4037, { roughness: 0.6 });
-  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.012, 8, 16, Math.PI), smileMat);
-  smile.position.set(0, eyeY - 0.14, eyeZ + 0.02);
-  smile.rotation.set(0.2, 0, Math.PI);
-  smile.castShadow = false;
-  head.add(smile);
-}
-
 /** Team-colour scarf / neck ribbon accent */
-function addTeamScarf(root, teamColor, y = 0.52) {
+function addTeamScarf(root, teamColor, y = 0.34) {
   const accent = softMat(hexNumber(teamColor), { roughness: 0.7 });
   const dark = softMat(shadeHex(teamColor, 0.7), { roughness: 0.72 });
-  addSphere(root, 0.18, accent, 0, y, 0.02, 1.15, 0.35, 1.05, 18);
-  // dangling tail
-  addCapsule(root, 0.035, 0.14, dark, 0.12, y - 0.1, 0.12, 0.4, 0, 0.3);
+  addSphere(root, 0.145, accent, 0, y, 0.02, 1.15, 0.35, 1.05, 18);
+  addCapsule(root, 0.03, 0.1, dark, 0.1, y - 0.08, 0.1, 0.4, 0, 0.3);
   return accent;
 }
 
 /** Lead gold badge on chest */
-function addLeadBadge(root, y = 0.38) {
+function addLeadBadge(root, y = 0.22) {
   const gold = softMat(0xffd54f, { roughness: 0.35, metalness: 0.45, emissive: 0xffa000, emissiveIntensity: 0.12 });
   const rim = softMat(0xb8860b, { roughness: 0.4, metalness: 0.5 });
-  addSphere(root, 0.055, gold, 0, y, 0.22, 1, 1, 0.55, 14);
-  addSphere(root, 0.065, rim, 0, y, 0.21, 1, 1, 0.4, 14);
-}
-
-function addLimbs(root, furMat, opts = {}) {
-  const armY = opts.armY ?? 0.38;
-  const legY = opts.legY ?? 0.12;
-  // Arms
-  addCapsule(root, 0.07, 0.12, furMat, -0.28, armY, 0.02, 0, 0, 0.85);
-  addCapsule(root, 0.07, 0.12, furMat, 0.28, armY, 0.02, 0, 0, -0.85);
-  // Feet / legs — stubby plush feet
-  const footMat = opts.footMat || furMat;
-  addSphere(root, 0.1, footMat, -0.12, legY, 0.04, 1.1, 0.7, 1.35, 14);
-  addSphere(root, 0.1, footMat, 0.12, legY, 0.04, 1.1, 0.7, 1.35, 14);
+  addSphere(root, 0.045, gold, 0, y, 0.18, 1, 1, 0.55, 14);
+  addSphere(root, 0.055, rim, 0, y, 0.17, 1, 1, 0.4, 14);
 }
 
 /**
- * Round cream bear with pink inner ears / cheek accents (bubu silhouette).
+ * Golden-brown relaxed bear — clearly seated.
+ * Root origin = hip contact on chair cushion. Face along local +Z (desk when yaw=π).
  */
-function buildBubu(teamColor, isLead) {
-  const root = new THREE.Group();
-  const fur = softMat(0xfff6ea, { roughness: 0.88 });
-  const furShade = softMat(0xf5e6d3, { roughness: 0.9 });
-  const pink = softMat(0xf8bbd0, { roughness: 0.85 });
-  const belly = softMat(0xfffaf5, { roughness: 0.9 });
-
-  // Body
-  addSphere(root, 0.32, fur, 0, 0.34, 0, 1.05, 0.95, 0.95, 28);
-  addSphere(root, 0.2, belly, 0, 0.32, 0.18, 1.1, 1.0, 0.55, 18);
-  // Head
-  const head = new THREE.Group();
-  head.position.set(0, 0.72, 0);
-  root.add(head);
-  addSphere(head, 0.3, fur, 0, 0, 0, 1.05, 1.0, 1.0, 28);
-  // Ears
-  addSphere(head, 0.1, furShade, -0.22, 0.22, -0.02, 1, 1.05, 0.7, 16);
-  addSphere(head, 0.1, furShade, 0.22, 0.22, -0.02, 1, 1.05, 0.7, 16);
-  addSphere(head, 0.055, pink, -0.22, 0.22, 0.04, 1, 1, 0.5, 12);
-  addSphere(head, 0.055, pink, 0.22, 0.22, 0.04, 1, 1, 0.5, 12);
-
-  addPlushFace(head, { eyeY: 0.02, eyeZ: 0.26, noseColor: 0x5d4037, noseR: 0.035 });
-  addLimbs(root, fur, { footMat: softMat(0xfce4ec, { roughness: 0.88 }) });
-  addTeamScarf(root, teamColor, 0.54);
-  if (isLead) addLeadBadge(root);
-
-  // Soft pink bow accent on ear
-  addSphere(root, 0.045, pink, -0.26, 0.92, 0.08, 1.6, 0.7, 0.7, 10);
-  return root;
-}
-
-/**
- * Soft brown companion bear (dudu silhouette).
- */
-function buildDudu(teamColor, isLead) {
-  const root = new THREE.Group();
-  const fur = softMat(0x8d6e63, { roughness: 0.88 });
-  const furDark = softMat(0x6d4c41, { roughness: 0.9 });
-  const belly = softMat(0xd7ccc8, { roughness: 0.9 });
-  const muzzle = softMat(0xe0d0c4, { roughness: 0.88 });
-
-  addSphere(root, 0.33, fur, 0, 0.34, 0, 1.08, 0.95, 0.98, 28);
-  addSphere(root, 0.2, belly, 0, 0.3, 0.18, 1.15, 1.05, 0.55, 18);
-
-  const head = new THREE.Group();
-  head.position.set(0, 0.74, 0);
-  root.add(head);
-  addSphere(head, 0.31, fur, 0, 0, 0, 1.05, 1.0, 1.0, 28);
-  addSphere(head, 0.14, muzzle, 0, -0.06, 0.2, 1.25, 0.95, 0.75, 18);
-  // Ears
-  addSphere(head, 0.1, furDark, -0.23, 0.22, -0.02, 1, 1.05, 0.7, 16);
-  addSphere(head, 0.1, furDark, 0.23, 0.22, -0.02, 1, 1.05, 0.7, 16);
-  addSphere(head, 0.05, softMat(0xbcaaa4, { roughness: 0.88 }), -0.23, 0.22, 0.04, 1, 1, 0.5, 12);
-  addSphere(head, 0.05, softMat(0xbcaaa4, { roughness: 0.88 }), 0.23, 0.22, 0.04, 1, 1, 0.5, 12);
-
-  addPlushFace(head, { eyeY: 0.04, eyeZ: 0.28, eyeX: 0.1, noseColor: 0x3e2723, noseR: 0.038 });
-  addLimbs(root, fur, { footMat: furDark });
-  addTeamScarf(root, teamColor, 0.55);
-  if (isLead) addLeadBadge(root);
-  return root;
-}
-
-/**
- * Soft pink rabbit-hooded chibi (melody-inspired silhouette: hood + ears, white face oval, pink body).
- */
-function buildMelody(teamColor, isLead) {
-  const root = new THREE.Group();
-  const pink = softMat(0xf48fb1, { roughness: 0.86 });
-  const pinkDeep = softMat(0xec407a, { roughness: 0.84 });
-  const hood = softMat(0xf8bbd0, { roughness: 0.88 });
-  const face = softMat(0xfff8f5, { roughness: 0.9 });
-  const white = softMat(0xffffff, { roughness: 0.88 });
-  const earInner = softMat(0xfce4ec, { roughness: 0.9 });
-
-  // Body (pink dress / plush torso)
-  addSphere(root, 0.3, pink, 0, 0.32, 0, 1.1, 1.05, 1.0, 28);
-  addSphere(root, 0.18, white, 0, 0.34, 0.16, 1.15, 1.0, 0.55, 16);
-  // Skirt flare
-  addSphere(root, 0.22, pinkDeep, 0, 0.18, 0, 1.35, 0.55, 1.2, 20);
-
-  const head = new THREE.Group();
-  head.position.set(0, 0.7, 0);
-  root.add(head);
-  // Hood / head pink shell
-  addSphere(head, 0.3, hood, 0, 0.02, -0.02, 1.08, 1.05, 1.05, 28);
-  // White face oval
-  addSphere(head, 0.22, face, 0, -0.02, 0.12, 1.05, 1.1, 0.75, 22);
-
-  // Long rabbit ears on hood
-  const earL = addCapsule(head, 0.07, 0.28, hood, -0.14, 0.42, -0.02, 0.15, 0, 0.25);
-  const earR = addCapsule(head, 0.07, 0.28, hood, 0.14, 0.42, -0.02, 0.15, 0, -0.25);
-  earL.scale.set(1, 1, 0.7);
-  earR.scale.set(1, 1, 0.7);
-  addCapsule(head, 0.035, 0.18, earInner, -0.14, 0.4, 0.02, 0.15, 0, 0.25);
-  addCapsule(head, 0.035, 0.18, earInner, 0.14, 0.4, 0.02, 0.15, 0, -0.25);
-
-  // Soft hood side puffs
-  addSphere(head, 0.1, hood, -0.26, 0.0, 0.0, 0.9, 1.0, 0.85, 14);
-  addSphere(head, 0.1, hood, 0.26, 0.0, 0.0, 0.9, 1.0, 0.85, 14);
-
-  addPlushFace(head, {
-    eyeY: 0.0,
-    eyeZ: 0.26,
-    eyeX: 0.09,
-    eyeR: 0.04,
-    noseColor: 0xf06292,
-    noseR: 0.03,
-  });
-
-  // Flower / team accent on hood
-  const flower = softMat(hexNumber(teamColor), { roughness: 0.65 });
-  addSphere(head, 0.055, flower, 0.2, 0.18, 0.18, 1, 1, 0.6, 12);
-  addSphere(head, 0.025, softMat(0xfff59d, { roughness: 0.5 }), 0.2, 0.18, 0.22, 1, 1, 1, 8);
-
-  addLimbs(root, pink, { footMat: softMat(0xfce4ec, { roughness: 0.88 }), armY: 0.36 });
-  addTeamScarf(root, teamColor, 0.5);
-  if (isLead) addLeadBadge(root, 0.36);
-  return root;
-}
-
-/**
- * Golden-brown relaxed bear with cream muzzle oval (rilakkuma-inspired silhouette).
- */
-function buildRilakkuma(teamColor, isLead) {
+function buildRilakkumaSeated(teamColor, isLead) {
   const root = new THREE.Group();
   const fur = softMat(0xc9a66b, { roughness: 0.88 });
   const furWarm = softMat(0xb8956a, { roughness: 0.9 });
@@ -259,71 +91,85 @@ function buildRilakkuma(teamColor, isLead) {
   const belly = softMat(0xe8d5b7, { roughness: 0.9 });
   const noseMat = softMat(0x3e2723, { roughness: 0.45 });
 
-  addSphere(root, 0.34, fur, 0, 0.33, 0, 1.12, 0.92, 1.0, 28);
-  addSphere(root, 0.2, belly, 0, 0.3, 0.18, 1.2, 1.05, 0.55, 18);
+  // Squatter torso — sits deep on the cushion (bottom ≈ y=0)
+  addSphere(root, 0.26, fur, 0, 0.2, -0.02, 1.2, 0.88, 1.05, 28);
+  addSphere(root, 0.16, belly, 0, 0.18, 0.14, 1.25, 1.0, 0.55, 18);
 
+  // Head — slightly forward over the desk
   const head = new THREE.Group();
-  head.position.set(0, 0.72, 0);
+  head.name = 'head';
+  head.position.set(0, 0.46, 0.04);
   root.add(head);
-  addSphere(head, 0.32, fur, 0, 0, 0, 1.08, 1.0, 1.02, 28);
-  // Cream muzzle oval — signature silhouette cue
-  addSphere(head, 0.16, muzzle, 0, -0.08, 0.2, 1.35, 1.05, 0.8, 20);
-  // Dark oval nose
-  addSphere(head, 0.055, noseMat, 0, -0.04, 0.32, 1.15, 0.85, 0.7, 14);
+  addSphere(head, 0.25, fur, 0, 0, 0, 1.1, 1.0, 1.02, 28);
+  addSphere(head, 0.125, muzzle, 0, -0.06, 0.16, 1.35, 1.05, 0.8, 20);
+  addSphere(head, 0.042, noseMat, 0, -0.03, 0.26, 1.15, 0.85, 0.7, 14);
 
-  // Simple round ears
-  addSphere(head, 0.11, furWarm, -0.24, 0.24, -0.04, 1, 1.0, 0.65, 16);
-  addSphere(head, 0.11, furWarm, 0.24, 0.24, -0.04, 1, 1.0, 0.65, 16);
-  addSphere(head, 0.05, softMat(0xd7ccc8, { roughness: 0.9 }), -0.24, 0.24, 0.02, 1, 1, 0.45, 10);
-  addSphere(head, 0.05, softMat(0xd7ccc8, { roughness: 0.9 }), 0.24, 0.24, 0.02, 1, 1, 0.45, 10);
+  addSphere(head, 0.085, furWarm, -0.19, 0.19, -0.03, 1, 1.0, 0.65, 16);
+  addSphere(head, 0.085, furWarm, 0.19, 0.19, -0.03, 1, 1.0, 0.65, 16);
+  addSphere(head, 0.04, softMat(0xd7ccc8, { roughness: 0.9 }), -0.19, 0.19, 0.02, 1, 1, 0.45, 10);
+  addSphere(head, 0.04, softMat(0xd7ccc8, { roughness: 0.9 }), 0.19, 0.19, 0.02, 1, 1, 0.45, 10);
 
-  // Eyes a bit higher / spaced for relaxed look
   const eyeMat = softMat(0x2a2a32, { roughness: 0.45 });
   const shineMat = softMat(0xffffff, { roughness: 0.2, emissive: 0xffffff, emissiveIntensity: 0.12 });
-  addSphere(head, 0.042, eyeMat, -0.11, 0.06, 0.28, 1, 1.2, 0.85, 14);
-  addSphere(head, 0.042, eyeMat, 0.11, 0.06, 0.28, 1, 1.2, 0.85, 14);
-  addSphere(head, 0.015, shineMat, -0.12, 0.08, 0.31, 1, 1, 1, 8);
-  addSphere(head, 0.015, shineMat, 0.1, 0.08, 0.31, 1, 1, 1, 8);
+  addSphere(head, 0.034, eyeMat, -0.09, 0.045, 0.23, 1, 1.2, 0.85, 14);
+  addSphere(head, 0.034, eyeMat, 0.09, 0.045, 0.23, 1, 1.2, 0.85, 14);
+  addSphere(head, 0.012, shineMat, -0.1, 0.06, 0.26, 1, 1, 1, 8);
+  addSphere(head, 0.012, shineMat, 0.08, 0.06, 0.26, 1, 1, 1, 8);
 
-  // Soft smile on muzzle
   const smileMat = softMat(0x5d4037, { roughness: 0.6 });
-  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 8, 16, Math.PI), smileMat);
-  smile.position.set(0, -0.14, 0.3);
+  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.01, 8, 16, Math.PI), smileMat);
+  smile.position.set(0, -0.11, 0.24);
   smile.rotation.set(0.25, 0, Math.PI);
   head.add(smile);
 
-  // Blush
   const blushMat = softMat(0xe57373, { roughness: 0.9, transparent: true, opacity: 0.35 });
-  addSphere(head, 0.045, blushMat, -0.2, -0.02, 0.22, 1.3, 0.7, 0.5, 10);
-  addSphere(head, 0.045, blushMat, 0.2, -0.02, 0.22, 1.3, 0.7, 0.5, 10);
+  addSphere(head, 0.035, blushMat, -0.16, -0.015, 0.18, 1.3, 0.7, 0.5, 10);
+  addSphere(head, 0.035, blushMat, 0.16, -0.015, 0.18, 1.3, 0.7, 0.5, 10);
 
-  addLimbs(root, fur, { footMat: furWarm, armY: 0.36 });
-  addTeamScarf(root, teamColor, 0.52);
-  if (isLead) addLeadBadge(root);
+  // Horizontal thighs on the seat + feet dangling a little toward the desk
+  const legs = new THREE.Group();
+  legs.name = 'legs';
+  root.add(legs);
+  // Thighs flat along +Z (toward desk)
+  addCapsule(legs, 0.08, 0.14, fur, -0.12, 0.05, 0.12, Math.PI / 2, 0, 0.12);
+  addCapsule(legs, 0.08, 0.14, fur, 0.12, 0.05, 0.12, Math.PI / 2, 0, -0.12);
+  // Lower legs drop toward floor a bit
+  addCapsule(legs, 0.065, 0.08, furWarm, -0.13, -0.02, 0.3, 0.35, 0, 0);
+  addCapsule(legs, 0.065, 0.08, furWarm, 0.13, -0.02, 0.3, 0.35, 0, 0);
+  addSphere(legs, 0.085, furWarm, -0.13, -0.06, 0.38, 1.2, 0.6, 1.3, 14);
+  addSphere(legs, 0.085, furWarm, 0.13, -0.06, 0.38, 1.2, 0.6, 1.3, 14);
+
+  // Arms reaching onto the desk / keyboard
+  const arms = new THREE.Group();
+  arms.name = 'arms';
+  root.add(arms);
+  addCapsule(arms, 0.06, 0.14, fur, -0.22, 0.24, 0.14, 1.05, 0, 0.25);
+  addCapsule(arms, 0.06, 0.14, fur, 0.22, 0.24, 0.14, 1.05, 0, -0.25);
+  addSphere(arms, 0.062, furWarm, -0.16, 0.16, 0.36, 1.15, 0.8, 1.1, 12);
+  addSphere(arms, 0.062, furWarm, 0.16, 0.16, 0.36, 1.15, 0.8, 1.1, 12);
+
+  addTeamScarf(root, teamColor, 0.34);
+  if (isLead) addLeadBadge(root, 0.22);
+
   return root;
 }
 
-const BUILDERS = {
-  bubu: buildBubu,
-  dudu: buildDudu,
-  melody: buildMelody,
-  rilakkuma: buildRilakkuma,
-};
-
 /**
- * Build a cute 3D figure group for a team member.
+ * Build a seated rilakkuma figure for a team member.
  * @param {{ color: string, isLead?: boolean }} member
  * @param {number} index
- * @returns {{ root: THREE.Group, figureType: FigureType, height: number }}
+ * @returns {{ root: THREE.Group, figureType: FigureType, height: number, arms: THREE.Object3D | null, head: THREE.Object3D | null }}
  */
 export function createFigure(member, index) {
-  const figureType = figureTypeForIndex(index);
-  const builder = BUILDERS[figureType];
-  const root = builder(member.color, !!member.isLead);
+  void index;
+  const figureType = /** @type {FigureType} */ ('rilakkuma');
+  const root = buildRilakkumaSeated(member.color, !!member.isLead);
   root.name = `figure-${figureType}`;
-  // Uniform scale — lead slightly larger
-  const s = member.isLead ? 1.22 : 1.1;
+  const s = member.isLead ? 1.12 : 1.02;
   root.scale.setScalar(s);
-  const height = 1.08 * s;
-  return { root, figureType, height };
+  // Head top ≈ 0.46+0.25 = 0.71 local
+  const height = 0.74 * s;
+  const arms = root.getObjectByName('arms') || null;
+  const head = root.getObjectByName('head') || null;
+  return { root, figureType, height, arms, head };
 }

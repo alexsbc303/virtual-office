@@ -4,8 +4,8 @@ Polished **3D anime-style** virtual office for the AS bot team.
 
 Stack: **Vite + Three.js** with soft Shinkai-like lighting, wood desks, glass
 meeting room, pantry, hanging plants, and industrial ceiling. Bots appear as
-**cute procedural 3D plush/chibi figures** (four silhouette styles cycled across
-the roster) with team-colour scarf accents, status rings, and name tags.
+**cute procedural 3D rilakkuma-style plush figures** (all bots share the golden-brown
+relaxed-bear silhouette) seated at desks, with team-colour scarf accents, status rings, and name tags.
 Live presence via **Supabase Realtime** (`bot_status`, `usage_snapshot`).
 
 ## Quick start
@@ -49,5 +49,6 @@ npm run build
 3D room framed like the anime reference: bright open-plan, floor-to-ceiling
 windows with city backdrop, warm wood desks, glass directorate room, kitchenette,
 hanging plants, industrial pipes and track lights. Soft warm window light +
-ACES tone mapping. Figures are original procedural meshes (soft materials,
+ACES tone mapping. Figures are original procedural seated plush meshes (soft materials,
 chibi proportions) with team colours on scarves, badge rings, and desk tags.
+Each bot sits on their office chair facing a computer.

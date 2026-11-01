@@ -10,12 +10,46 @@ import { createSkylineTexture } from './skyline.js';
 export const ROOM = { w: 18, d: 12, h: 4.2 };
 
 /**
- * Desk / seat anchors in world space (feet on floor).
+ * Chair / desk seating constants — keep in sync with buildDesk().
+ * Desk surface at (deskX, deskH, deskZ); monitors face +Z; chair sits on +Z side.
+ * Seated figures face −Z (toward keyboard/monitors): faceYaw = Math.PI.
+ */
+export const CHAIR = {
+  /** Chair seat center relative to desk center on Z */
+  offsetZ: 0.58,
+  /** Top of seat cushion (figure root Y) */
+  seatY: 0.45,
+  /** Yaw so local +Z (face) aims at desk (−Z world) */
+  faceYaw: Math.PI,
+};
+
+/**
+ * Build seat pose from a desk center.
+ * @param {number} deskX
+ * @param {number} deskZ
+ * @param {string} zone
+ */
+export function seatFromDesk(deskX, deskZ, zone = 'open') {
+  return {
+    x: deskX,
+    y: 0,
+    z: deskZ,
+    seatX: deskX,
+    seatY: CHAIR.seatY,
+    seatZ: deskZ + CHAIR.offsetZ,
+    faceYaw: CHAIR.faceYaw,
+    zone,
+  };
+}
+
+/**
+ * Desk / seat anchors in world space.
  * +X = pantry side, −X = windows, +Z = camera / entrance, −Z = back wall.
+ * Use seatX/seatY/seatZ for figure placement; x/z remain desk centers.
  */
 export function deskLayout() {
   const desks = new Map();
-  desks.set(LEAD_ID, { x: 3.2, y: 0, z: -2.8, zone: 'lead' });
+  desks.set(LEAD_ID, seatFromDesk(3.2, -2.8, 'lead'));
 
   const openPlan = [
     { id: '26fffc1c-3c69-4346-8a68-199db47277fd', x: -5.2, z: 2.4 },
@@ -31,12 +65,12 @@ export function deskLayout() {
     { id: '6a0dc819-57c2-4507-ae25-f3b3122c3f46', x: 5.6, z: 1.8 },
   ];
   for (const d of openPlan) {
-    desks.set(d.id, { x: d.x, y: 0, z: d.z, zone: 'open' });
+    desks.set(d.id, seatFromDesk(d.x, d.z, 'open'));
   }
   return desks;
 }
 
-export const LEAD_HANDOFF = { x: 2.4, y: 0, z: -1.6 };
+export const LEAD_HANDOFF = { x: 2.4, y: CHAIR.seatY, z: -1.6 };
 
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({
@@ -294,11 +328,13 @@ function buildDesk(root, x, z, wood, woodDark, blackMetal, screenGlow, plant, po
     box(0.22, 0.02, 0.14, blackMetal, x + ox, h + 0.02, z - 0.2, root, false);
   }
   box(0.36, 0.015, 0.2, blackMetal, x, h + 0.03, z + 0.12, root, false);
-  // Chair
+  // Chair — seat top at CHAIR.seatY (0.475); center at z + CHAIR.offsetZ
   const seat = mat(0x262c34, { roughness: 0.7 });
-  box(0.5, 0.07, 0.5, seat, x, 0.44, z + 0.58, root);
-  box(0.5, 0.58, 0.07, seat, x, 0.75, z + 0.78, root);
-  cyl(0.18, 0.18, 0.04, blackMetal, x, 0.12, z + 0.58, root, 12, false);
+  const chairZ = z + 0.58;
+  box(0.52, 0.08, 0.52, seat, x, 0.435, chairZ, root); // top ≈ 0.475
+  box(0.52, 0.55, 0.08, seat, x, 0.74, chairZ + 0.22, root);
+  cyl(0.06, 0.06, 0.35, blackMetal, x, 0.22, chairZ, root, 10, false);
+  cyl(0.2, 0.2, 0.04, blackMetal, x, 0.08, chairZ, root, 12, false);
   // Desk plant + mug
   cyl(0.055, 0.07, 0.07, pot, x + 0.55, h + 0.05, z + 0.22, root, 10, false);
   const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.22, 8), plant);
@@ -343,6 +379,17 @@ function buildMeetingRoom(root, wood, woodDark, glassMat, frost, blackMetal) {
   for (const [lx, lz] of [[-0.95, -0.42], [0.95, -0.42], [-0.95, 0.42], [0.95, 0.42]]) {
     box(0.08, 0.72, 0.08, woodDark, cx + lx, 0.36, cz + lz, root);
   }
+  // Lead workstation: laptop on +Z edge of table + office chair
+  const leadX = 3.2;
+  const leadDeskZ = -2.8;
+  const leadChairZ = leadDeskZ + 0.58;
+  box(0.42, 0.02, 0.28, blackMetal, leadX, 0.78, leadDeskZ - 0.05, root, false);
+  box(0.38, 0.24, 0.015, mat(0x9ad0ef, { roughness: 0.25, emissive: 0x4a88aa, emissiveIntensity: 0.55 }), leadX, 0.92, leadDeskZ - 0.16, root, false);
+  const seat = mat(0x262c34, { roughness: 0.7 });
+  box(0.52, 0.08, 0.52, seat, leadX, 0.435, leadChairZ, root);
+  box(0.52, 0.55, 0.08, seat, leadX, 0.74, leadChairZ + 0.22, root);
+  cyl(0.06, 0.06, 0.35, blackMetal, leadX, 0.22, leadChairZ, root, 10, false);
+  cyl(0.2, 0.2, 0.04, blackMetal, leadX, 0.08, leadChairZ, root, 12, false);
 }
 
 function buildPantry(root, wood, woodDark, metal) {

@@ -301,13 +301,13 @@ async function boot() {
   // Deterministic camera presets for screenshots / deep links
   const cam = new URLSearchParams(window.location.search).get('cam');
   if (cam === 'closeup') {
-    camera.position.set(1.2, 1.55, 4.2);
-    controls.target.set(-3.4, 0.85, 1.2);
+    camera.position.set(1.4, 1.65, 4.6);
+    controls.target.set(-3.4, 0.95, 3.0);
     basePos.copy(camera.position);
     controls.update();
   } else if (cam === 'lead') {
-    camera.position.set(6.0, 2.0, -0.2);
-    controls.target.set(3.2, 0.85, -2.6);
+    camera.position.set(6.0, 2.1, 0.3);
+    controls.target.set(3.2, 0.95, -2.2);
     basePos.copy(camera.position);
     controls.update();
   } else if (cam === 'zones') {
