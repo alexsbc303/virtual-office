@@ -72,7 +72,7 @@ export const ZONES = [
   {
     id: 'programming',
     labelEn: 'Programming',
-    labelZh: '编程',
+    labelZh: '編程',
     color: 0xff4d9a,
     fill: 0x301028,
     x: 1.15,
@@ -128,7 +128,7 @@ export const ZONES = [
 
 /**
  * Desk / seat anchors by sidebar section.
- * Reception 1 · Programming 1 · General 4 · ITSS1 5 · Self Enhancement 1.
+ * Reception 1 · Programming 1 · General 4 · ITSS1 5 · Self Enhancement 2.
  * Meeting = huddle seats + short handoff visit. Social lounge sits inside Self Enhancement.
  */
 export function deskLayout() {
@@ -152,16 +152,20 @@ export function deskLayout() {
     desks.set(d.id, seatFromDesk(d.x, d.z, 'itss1'));
   }
 
-  // Programming / 编程 — Coding Bot dual-monitor bay
+  // Programming / 編程 — Coding Bot dual-monitor bay
   desks.set(
     'b7c9b07d-4a12-49af-bbdf-7fa19bdc96b2',
     seatFromDesk(1.15, -4.2, 'programming'),
   );
 
-  // Self Enhancement — Grok Bot Coach
+  // Self Enhancement — Grok Bot Coach, dr eggbot on the west side
   desks.set(
     '764c93f4-9330-4daa-9f86-481be3b19e60',
-    seatFromDesk(5.6, -4.6, 'self'),
+    seatFromDesk(5.85, -4.6, 'self'),
+  );
+  desks.set(
+    'e6df6ca8-5abd-43f5-8f47-4175b801b4c4',
+    seatFromDesk(4.15, -4.6, 'self'),
   );
 
   // General — 4 seats on OUTER sides of two tables (avoid mid-aisle stack)
@@ -473,8 +477,9 @@ export function buildOfficeScene(scene, _loader) {
   // ——— Programming: dual-monitor coding bay ———
   buildCodingBay(root, 1.15, -4.2, wood, woodWarm, blackMetal, screenGlow, plantLeaf, pot, partitionMat);
 
-  // ——— Self Enhancement desk + social lounge ———
-  buildFocusDesk(root, 5.6, -4.6, wood, woodWarm, blackMetal, screenGlow, plantLeaf, pot, partitionMat);
+  // ——— Self Enhancement: coach + dr eggbot, social lounge ———
+  buildFocusDesk(root, 5.85, -4.6, wood, woodWarm, blackMetal, screenGlow, plantLeaf, pot, partitionMat);
+  buildFocusDesk(root, 4.15, -4.6, wood, woodWarm, blackMetal, screenGlow, plantLeaf, pot, partitionMat);
   buildSocialLounge(root, wood, woodWarm, sofaMat, loungeAccent, plantLeaf, plantLeafDark, pot, potWarm);
 
   // ——— Meeting (handoff) ———

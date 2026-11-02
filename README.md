@@ -3,7 +3,7 @@
 **3D isometric virtual office** for the AS bot team (Dallas-style HUD chrome).
 
 Stack: **Vite + Three.js** true cutaway / dollhouse (no ceiling, no exterior city
-backdrop). Zones follow sidebar sections: **Reception / 總管 · Programming / 编程 ·
+backdrop). Zones follow sidebar sections: **Reception / 總管 · Programming / 編程 ·
 General · ITSS1 · Self Enhancement** (Meeting = open huddle area, seats stay; Social lounge amenity).
 Tech / sci-fi materials: cool LED accents, glass, holographic panels, dark tech floor
 mixed with warm wood desks; procedural foliage (not blob plants). Bots are **seated

@@ -484,7 +484,7 @@ async function boot() {
     itss1: { pos: [-2.5, 7.2, 1.8], target: [-5.0, 0.5, -3.5] },
     programming: { pos: [4.5, 6.5, 2.0], target: [1.15, 0.5, -3.8] },
     general: { pos: [3.5, 7.0, 11.0], target: [-0.3, 0.5, 3.5] },
-    self: { pos: [11.5, 6.5, 2.0], target: [5.5, 0.5, -3.5] },
+    self: { pos: [11.5, 6.5, 2.0], target: [5.0, 0.5, -3.8] },
     social: { pos: [11.5, 6.5, 2.0], target: [5.5, 0.5, -3.5] },
     plants: { pos: [10.5, 5.8, -1.5], target: [6.5, 0.7, -4.0] },
     // From the office floor, looking at 總管's face across the guest lip.
